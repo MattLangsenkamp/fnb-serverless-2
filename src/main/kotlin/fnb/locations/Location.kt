@@ -9,7 +9,6 @@ data class Location(val id: String,
                     val longitude: Double,
                     val pictureURI: String,
                     val type: LocationType
-                    //val timeCreated: DateTime
     )
 
 enum class LocationType {
