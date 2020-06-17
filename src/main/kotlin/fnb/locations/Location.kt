@@ -1,5 +1,4 @@
 package fnb.locations
-import org.joda.time.DateTime
 
 data class Location(val id: String,
                     val name: String,
