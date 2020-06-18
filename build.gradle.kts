@@ -47,7 +47,7 @@ kotless {
     }
 
     webapp {
-        route53 = Route53("www", "testmatt.com")
+        route53 = Route53( "www","testmatt.com")
     }
 
     extensions {

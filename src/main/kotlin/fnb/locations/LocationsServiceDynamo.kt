@@ -1,14 +1,10 @@
 package fnb.locations
-import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder
-import com.amazonaws.services.dynamodbv2.document.Item
-import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import io.kotless.dsl.lang.DynamoDBTable
 import com.amazonaws.services.dynamodbv2.model.*
 import io.kotless.AwsResource
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.withKotlessLocal
-import org.joda.time.DateTime
 import java.util.UUID
 
 private const val tableName: String = "fnb-data"
@@ -17,7 +13,7 @@ private const val tableName: String = "fnb-data"
 object LocationsServiceDynamo {
     private val client = AmazonDynamoDBClientBuilder
         .standard()
-        .withKotlessLocal(AwsResource.DynamoDB)
+        //.withKotlessLocal(AwsResource.DynamoDB)
         //.withCredentials(ProfileCredentialsProvider(System.getenv("PROFILE_NAME")))
         .build()
     /**
