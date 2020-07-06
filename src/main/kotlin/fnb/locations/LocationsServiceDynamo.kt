@@ -1,4 +1,5 @@
 package fnb.locations
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder
 import io.kotless.dsl.lang.DynamoDBTable
 import com.amazonaws.services.dynamodbv2.model.*
@@ -11,7 +12,7 @@ private const val tableName: String = "fnb-data"
 
 @DynamoDBTable(tableName, PermissionLevel.ReadWrite)
 object LocationsServiceDynamo {
-    private val client = AmazonDynamoDBClientBuilder
+    val client: AmazonDynamoDB = AmazonDynamoDBClientBuilder
         .standard()
         //.withKotlessLocal(AwsResource.DynamoDB)
         //.withCredentials(ProfileCredentialsProvider(System.getenv("PROFILE_NAME")))

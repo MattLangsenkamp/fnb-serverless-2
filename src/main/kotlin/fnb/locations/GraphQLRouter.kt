@@ -1,6 +1,8 @@
 package fnb.locations
 import com.apurebase.kgraphql.schema.Schema
 import com.google.gson.Gson
+import io.kotless.PermissionLevel
+import io.kotless.dsl.lang.DynamoDBTable
 import io.ktor.routing.Route
 import io.ktor.application.call
 import io.ktor.request.receive
@@ -8,7 +10,9 @@ import io.ktor.response.respondText
 import io.ktor.routing.post
 import org.slf4j.Logger
 
+private const val tableName: String = "fnb-data"
 
+@DynamoDBTable(tableName, PermissionLevel.ReadWrite)
 data class GraphQLRequest(val query: String = "", val variables: Map<String, Any> = emptyMap())
 
 fun GraphQLErrors.asMap(): Map<String, Map<String, String>> {

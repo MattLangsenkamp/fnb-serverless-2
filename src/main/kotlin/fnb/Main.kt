@@ -39,21 +39,3 @@ fun Application.main() {
         graphql(log, Gson(), getSchema())
     }
 }
-
-
-//fun String.asJson() = ObjectMapper().readTree(this)
-//app.routing {
-//    //graphql()
-//    val schema = getSchema()
-//    post("graphql") {
-//        with(call) {
-//            val rawText = receiveText()
-//                .asJson()["query"]
-//                .toString()
-//                .replace("\\n", "")
-//
-//            val result = schema.executeBlocking(rawText)
-//            respondText { result }
-//        }
-//    }
-//}
