@@ -1,7 +1,10 @@
 package fnb.locations
+import com.apurebase.kgraphql.Context
 import com.apurebase.kgraphql.KGraphQL
 import com.apurebase.kgraphql.schema.Schema
-
+import io.ktor.util.StringValues
+import io.ktor.http.Headers
+import org.slf4j.Logger
 
 fun getSchema(): Schema {
 
@@ -14,7 +17,9 @@ fun getSchema(): Schema {
         }
 
         query("getAllLocations") {
-            resolver { ->
+            resolver { ctx: Context ->
+                val log = ctx.get<Logger>()
+                val tkns = ctx.get<Map<String, String>>()
                 LocationsServiceDynamo.getAllLocations()
             }
         }

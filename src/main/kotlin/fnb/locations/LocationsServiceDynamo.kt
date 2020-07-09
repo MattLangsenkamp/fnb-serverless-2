@@ -1,4 +1,5 @@
 package fnb.locations
+import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder
 import io.kotless.dsl.lang.DynamoDBTable
@@ -15,7 +16,7 @@ object LocationsServiceDynamo {
     val client: AmazonDynamoDB = AmazonDynamoDBClientBuilder
         .standard()
         //.withKotlessLocal(AwsResource.DynamoDB)
-        //.withCredentials(ProfileCredentialsProvider(System.getenv("PROFILE_NAME")))
+        .withCredentials(ProfileCredentialsProvider("fnb-admin"))
         .build()
     /**
      * Creates a new location entry in DynamoDB

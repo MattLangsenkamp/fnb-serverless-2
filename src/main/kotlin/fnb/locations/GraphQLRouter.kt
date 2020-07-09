@@ -1,4 +1,5 @@
 package fnb.locations
+import com.apurebase.kgraphql.context
 import com.apurebase.kgraphql.schema.Schema
 import com.google.gson.Gson
 import io.kotless.PermissionLevel
@@ -27,6 +28,18 @@ data class GraphQLErrors(val e: Exception)
 fun Route.graphql(log: Logger, gson: Gson, schema: Schema) {
     post("/graphql") {
         val request = call.receive<GraphQLRequest>()
+        val accessTkn = call.request.headers["AccessToken"] ?: "no-access-token"
+        val refreshTkn = call.request.headers["RefreshToken"] ?: "no-refresh-token"
+
+        val tkns = mapOf<String, String>(
+                "accessToken" to accessTkn,
+                "refreshToken" to refreshTkn
+        )
+
+        val ctx = context {
+            +tkns;
+            +log
+        }
 
         val query = request.query
         log.info("the graphql query: $query")
@@ -35,7 +48,7 @@ fun Route.graphql(log: Logger, gson: Gson, schema: Schema) {
         log.info("the graphql variables: $variables")
 
         try {
-            val result = schema.executeBlocking(query, variables = variables)
+            val result = schema.execute(query, variables = variables, context = ctx)
             call.respondText(result)
         } catch (e: Exception) {
             call.respondText(gson.toJson(GraphQLErrors(e).asMap()))
