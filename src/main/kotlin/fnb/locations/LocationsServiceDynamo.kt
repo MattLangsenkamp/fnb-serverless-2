@@ -4,9 +4,7 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder
 import io.kotless.dsl.lang.DynamoDBTable
 import com.amazonaws.services.dynamodbv2.model.*
-import io.kotless.AwsResource
 import io.kotless.PermissionLevel
-import io.kotless.dsl.lang.withKotlessLocal
 import java.util.UUID
 
 private const val tableName: String = "fnb-data"
@@ -39,7 +37,7 @@ object LocationsServiceDynamo {
                     type: LocationType
     ): Location? {
         val id: UUID = UUID.randomUUID()
-        val item = mapOf<String, AttributeValue>(
+        val item = mapOf(
             "id" to AttributeValue().apply { s = id.toString() },
             "name" to AttributeValue().apply { s = name },
             "friendlyLocation" to AttributeValue().apply { s = friendlyLocation },
@@ -80,7 +78,7 @@ object LocationsServiceDynamo {
     fun getAllLocations():List<Location?> {
         val req = ScanRequest().withTableName(tableName)
         val res = client.scan(req).items
-        var locationList: ArrayList<Location?> = ArrayList()
+        val locationList: ArrayList<Location?> = ArrayList()
         for (item in res) {
             locationList.add(this.constructLocation(item))
         }
@@ -94,7 +92,7 @@ object LocationsServiceDynamo {
      * @return the new location object on success, null on failure
      */
     fun updateLocation(location: Location): Location? {
-        var map = mapOf(
+        val map = mapOf(
             "name" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.name }),
             "friendlyLocation" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.friendlyLocation }),
             "description" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.description }),
