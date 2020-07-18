@@ -31,13 +31,13 @@ fun Route.graphql(log: Logger, gson: Gson, schema: Schema) {
         val accessTkn = call.request.headers["AccessToken"] ?: "no-access-token"
         val refreshTkn = call.request.headers["RefreshToken"] ?: "no-refresh-token"
 
-        val tkns = mapOf<String, String>(
-                "accessToken" to accessTkn,
-                "refreshToken" to refreshTkn
+        val tokens = mapOf(
+                "AccessToken" to accessTkn,
+                "RefreshToken" to refreshTkn
         )
 
         val ctx = context {
-            +tkns;
+            +tokens
             +log
         }
 

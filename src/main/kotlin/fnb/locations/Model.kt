@@ -1,5 +1,6 @@
 package fnb.locations
 
+
 data class Location(val id: String,
                     val name: String,
                     val friendlyLocation: String,
@@ -7,8 +8,9 @@ data class Location(val id: String,
                     val latitude: Double,
                     val longitude: Double,
                     val pictureURI: String,
+                    val owner: String,
                     val type: LocationType
-    )
+)
 
 enum class LocationType {
     FREE_FOOD_STAND,
@@ -17,3 +19,9 @@ enum class LocationType {
     SHELTER,
     OTHER
 }
+
+data class Response(val message: String,
+                    val payload: List<Location?>,
+                    val AccessToken: String?,
+                    val RefreshToken: String?
+)

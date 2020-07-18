@@ -23,6 +23,9 @@ dependencies {
     implementation("commons-validator", "commons-validator", "1.6")
     implementation("io.ktor:ktor-auth-jwt:1.3.2")
     implementation("io.ktor:ktor-auth:1.3.2")
+    testImplementation("io.ktor:ktor-server-test-host:5.5.1")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.5.1")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.5.1")
 }
 
 tasks {

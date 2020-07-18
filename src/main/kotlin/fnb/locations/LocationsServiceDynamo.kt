@@ -4,7 +4,9 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder
 import io.kotless.dsl.lang.DynamoDBTable
 import com.amazonaws.services.dynamodbv2.model.*
+import io.kotless.AwsResource
 import io.kotless.PermissionLevel
+import io.kotless.dsl.lang.withKotlessLocal
 import java.util.UUID
 
 private const val tableName: String = "fnb-data"
@@ -13,7 +15,6 @@ private const val tableName: String = "fnb-data"
 object LocationsServiceDynamo {
     val client: AmazonDynamoDB = AmazonDynamoDBClientBuilder
         .standard()
-        //.withKotlessLocal(AwsResource.DynamoDB)
         .withCredentials(ProfileCredentialsProvider("fnb-admin"))
         .build()
     /**
@@ -34,6 +35,7 @@ object LocationsServiceDynamo {
                     latitude: Double,
                     longitude: Double,
                     pictureURI: String,
+                    owner: String,
                     type: LocationType
     ): Location? {
         val id: UUID = UUID.randomUUID()
@@ -45,6 +47,7 @@ object LocationsServiceDynamo {
             "latitude" to AttributeValue().apply { n = latitude.toString() },
             "longitude" to AttributeValue().apply { n = longitude.toString() },
             "pictureURI" to AttributeValue().apply { s = pictureURI },
+            "owner" to AttributeValue().apply { s = owner },
             "type" to AttributeValue().apply { s = type.toString() }
         )
         val req = PutItemRequest().withTableName(tableName).withItem(item).withReturnValues(ReturnValue.ALL_OLD)
@@ -102,26 +105,33 @@ object LocationsServiceDynamo {
             "type" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.type.toString() })
         )
         val req = UpdateItemRequest()
-            .withAttributeUpdates(map)
-            .withTableName(tableName)
-            .withKey(mapOf("id" to AttributeValue().apply { s = location.id }))
-            .withReturnValues(ReturnValue.UPDATED_NEW)
-        val res = client.updateItem(req).attributes
+                .withConditionExpression("owner = :owner")
+                .withExpressionAttributeValues(mapOf("owner" to AttributeValue().apply { s =  location.owner }))
+                .withAttributeUpdates(map)
+                .withTableName(tableName)
+                .withKey(mapOf("id" to AttributeValue().apply { s = location.id }))
+                .withReturnValues(ReturnValue.UPDATED_NEW)
+        val res = client.updateItem(req)
 
-        return this.constructLocation(res)
+        if (res.sdkHttpMetadata.httpStatusCode != 200) error("not authorized")
+
+        return this.constructLocation(res.attributes)
     }
 
     /**
      * Deletes a location entry from dynamo
      *
      * @param id guid identifier for entry to delete
+     * @param owner the id of the user that owns the location
      * @return the deleted location if successful, null otherwise
      */
-    fun deleteLocation(id: String): Location? {
+    fun deleteLocation(id: String, owner: String): Location? {
         val req = DeleteItemRequest()
-            .withKey(mapOf("id" to AttributeValue().apply { s = id }))
-            .withTableName(tableName)
-            .withReturnValues(ReturnValue.ALL_OLD)
+                .withConditionExpression("owner = :owner")
+                .withExpressionAttributeValues(mapOf("owner" to AttributeValue().apply { s =  owner }))
+                .withKey(mapOf("id" to AttributeValue().apply { s = id }))
+                .withTableName(tableName)
+                .withReturnValues(ReturnValue.ALL_OLD)
         val res = client.deleteItem(req).attributes
         //if res is success return 1
         return this.constructLocation(res)
@@ -137,7 +147,7 @@ object LocationsServiceDynamo {
                 res["description"]?.s.toString(),
                 res["latitude"]?.n.toString().toDouble(),
                 res["longitude"]?.n.toString().toDouble(),
-                res["pictureURI"]?.s.toString(),
+                res["pictureURI"]?.s.toString(), res["owner"]?.s.toString(),
                 LocationType.valueOf(res["type"]?.s.toString())
             )
         }
