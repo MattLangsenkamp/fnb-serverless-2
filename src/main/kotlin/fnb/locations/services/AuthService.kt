@@ -1,4 +1,4 @@
-package fnb.locations
+package fnb.locations.services
 
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
@@ -13,10 +13,9 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.JWTVerificationException
 import com.auth0.jwt.exceptions.TokenExpiredException
 import com.auth0.jwt.interfaces.DecodedJWT
-import io.kotless.AwsResource
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
-import io.kotless.dsl.lang.withKotlessLocal
+import io.ktor.application.ApplicationCall
 import java.util.*
 
 
@@ -42,33 +41,39 @@ object AuthService {
      * and RefreshToken to null token if unsuccessful
      */
     fun signIn(username: String, password: String): Map<String, String?> {
+        return try {
+            // search dynamo for match
+            val user = getUserInfo(username)
 
-        // search dynamo for match
-        val user = getUserInfo(username)
+            if (password != user["password"]?.s.toString()) return mapOf(
+                    "AccessToken" to null,
+                    "RefreshToken" to null
+            )
 
-        if (password != user["password"]?.s.toString()) return mapOf(
-            "AccessToken" to null,
-            "RefreshToken" to null
-        )
+            val permissionLevel = user["permissionLevel"]
+            val count = user["count"]
 
-        val permissionLevel = user["permissionLevel"]
-        val count = user["count"]
+            val accessToken = if (permissionLevel != null) {
+                signAccessToken(username, permissionLevel.s)
+            } else {
+                signAccessToken(username)
+            }
 
-        val accessToken = if (permissionLevel != null) {
-            this.signAccessToken(username, permissionLevel.s)
-        } else {
-            this.signAccessToken(username)
+            val refreshToken = if ((permissionLevel != null) && (count != null)) {
+                signRefreshToken(username, permissionLevel.s, count.n.toInt())
+            } else {
+                signRefreshToken(username)
+            }
+            mapOf(
+                    "AccessToken" to accessToken,
+                    "RefreshToken" to refreshToken
+            )
+        } catch (t: Throwable) {
+            mapOf(
+                    "AccessToken" to null,
+                    "RefreshToken" to null
+            )
         }
-
-        val refreshToken = if((permissionLevel !=null) && (count != null)) {
-            this.signRefreshToken(username, permissionLevel.s, count.n.toInt())
-        } else {
-            this.signRefreshToken(username)
-        }
-        return  mapOf(
-            "AccessToken" to accessToken,
-            "RefreshToken" to refreshToken
-        )
     }
 
     /**
@@ -101,8 +106,8 @@ object AuthService {
 
         if (client.putItem(req).sdkHttpMetadata.httpStatusCode == 200) {
             returnValue = mapOf(
-                "AccessToken" to this.signAccessToken(username),
-                "RefreshToken" to this.signRefreshToken(username)
+                "AccessToken" to signAccessToken(username),
+                "RefreshToken" to signRefreshToken(username)
             )
         }
         return returnValue
@@ -134,12 +139,12 @@ object AuthService {
                 val username = refreshTkn.getClaim("key").asString()
                 val tokenCount = refreshTkn.getClaim("count").asInt()
                 val tokenPermissionLevel = refreshTkn.getClaim("permissionLevel").asString()
-                val userInfo = this.getUserInfo(username)
+                val userInfo = getUserInfo(username)
 
                 val returnTokens: Map<String, DecodedJWT?> = if (userInfo["count"]?.n.toString().toInt() == tokenCount) {
                     mapOf(
                         "AccessToken" to verifier.verify(
-                                this.signAccessToken(username, tokenPermissionLevel)
+                                signAccessToken(username, tokenPermissionLevel)
                         ),
                         "RefreshToken" to refreshTkn
                     )
@@ -163,11 +168,40 @@ object AuthService {
         }
     }
 
+    fun setCookies(call: ApplicationCall, tokens: Map<String, DecodedJWT?>) {
+        call.response.cookies.append("fnb-AccessToken-Payload",
+                tokens["AccessToken"]?.header + '.' + tokens["AccessToken"]?.payload.toString())
+        call.response.cookies.append("fnb-AccessToken-Signature",
+                tokens["AccessToken"]?.signature.toString(), httpOnly = true)
+
+        call.response.cookies.append("fnb-RefreshToken-Payload",
+                tokens["RefreshToken"]?.header + '.' + tokens["RefreshToken"]?.payload.toString())
+        call.response.cookies.append("fnb-RefreshToken-Signature",
+                tokens["RefreshToken"]?.signature.toString(), httpOnly = true)
+    }
+
     fun invalidateRefreshToken(username: String): String {
-        val user = this.getUserInfo(username)
+        val user = getUserInfo(username)
         val count = user["count"]?.n.toString().toInt()
         val newCount = (count + 1) % Int.MAX_VALUE
         return ""//TODO
+    }
+
+    fun getCookiesOrAccessTokens(call: ApplicationCall):Map<String, String> {
+
+        val accessPayload = call.request.cookies["fnb-AccessToken-Payload"] ?: "<empty>"
+        val accessSig = call.request.cookies["fnb-AccessToken-Signature"] ?: "<empty>"
+        val refreshPayload = call.request.cookies["fnb-RefreshToken-Payload"] ?: "<empty>"
+        val refreshSig = call.request.cookies["fnb-RefreshToken-Signature"] ?: "<empty>"
+
+        var accessToken = "$accessPayload.$accessSig"
+        var refreshToken = "$refreshPayload.$refreshSig"
+
+        if ("<empty>" in refreshToken) { refreshToken = call.request.headers["RefreshToken"] ?: "no-refresh-token" }
+        if ("<empty>" in accessToken) { accessToken = call.request.headers["AccessToken"] ?: "no-access-token" }
+
+        return mapOf("AccessToken" to accessToken,
+                   "RefreshToken" to refreshToken)
     }
 
     /**
@@ -181,13 +215,13 @@ object AuthService {
         val refreshToken = tokens["RefreshToken"] ?: error("No access token provided")
         val accessToken = tokens["AccessToken"] ?: error("No refresh token provided")
         return mapOf(
-                "RefreshToken" to this.signRefreshToken(
-                        refreshToken.getClaim("key").asString() ,
+                "RefreshToken" to signRefreshToken(
+                        refreshToken.getClaim("key").asString(),
                         refreshToken.getClaim("permissionLevel").asString(),
                         refreshToken.getClaim("count").asInt()
                 ),
-                "AccessToken" to this.signAccessToken(
-                        accessToken.getClaim("key").asString() ,
+                "AccessToken" to signAccessToken(
+                        accessToken.getClaim("key").asString(),
                         accessToken.getClaim("permissionLevel").asString()
                 )
         )
@@ -199,7 +233,7 @@ object AuthService {
             this.add(Calendar.MINUTE, 5)
         }.time
         val actualPermissionLevel: String = permissionLevel ?:
-            this.getUserInfo(username)["PermissionLevel"]?.s.toString()
+            getUserInfo(username)["PermissionLevel"]?.s.toString()
 
         return JWT.create()
             .withIssuer(username)
@@ -214,16 +248,16 @@ object AuthService {
                                  count: Int? = null): String {
         val date = GregorianCalendar.getInstance().apply {
             this.time = Date()
-            this.add(Calendar.MINUTE, 1440)
+            this.add(Calendar.MINUTE, 8440)
         }.time
 
 
 
         val actualPermissionLevel: String = permissionLevel ?:
-            this.getUserInfo(username)["permissionLevel"]?.s.toString()
+            getUserInfo(username)["permissionLevel"]?.s.toString()
 
         val actualCount: Int = count ?:
-            this.getUserInfo(username)["count"]?.n.toString().toInt()
+            getUserInfo(username)["count"]?.n.toString().toInt()
 
         return JWT.create()
             .withIssuer(username)

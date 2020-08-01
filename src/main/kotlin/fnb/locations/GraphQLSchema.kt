@@ -2,47 +2,46 @@ package fnb.locations
 import com.apurebase.kgraphql.Context
 import com.apurebase.kgraphql.KGraphQL
 import com.apurebase.kgraphql.schema.Schema
+import com.auth0.jwt.JWT
+import fnb.locations.services.AuthService
+import fnb.locations.services.LocationsServiceDynamo
+import io.ktor.application.ApplicationCall
 import org.slf4j.Logger
 
 fun getSchema(): Schema {
-
     return KGraphQL.schema {
 
         query("getLocation") {
             resolver { id: String,
                        ctx: Context ->
-                val log = ctx.get<Logger>()
-                val tokens = ctx.get<Map<String, String>>() ?: mapOf("AccessToken" to null, "RefreshToken" to null)
+                val log = ctx.get<Logger>()!!
                 val location = LocationsServiceDynamo.getLocation(id)
                 val message = if (location != null) {
                     "Successfully fetched location with id: $id"
                 } else {
                     "Unable to fetch location with id: $id"
                 }
+                log.info(message)
                 Response(
                         message = message,
-                        payload = listOf(location),
-                        AccessToken = tokens["AccessToken"],
-                        RefreshToken = tokens["RefreshToken"]
+                        payload = listOf(location)
                 )
             }
         }
 
         query("getAllLocations") {
             resolver {  ctx: Context ->
-                val log = ctx.get<Logger>()
-                val tokens = ctx.get<Map<String, String>>() ?: mapOf("AccessToken" to null, "RefreshToken" to null)
+                val log = ctx.get<Logger>()!!
                 val locations = LocationsServiceDynamo.getAllLocations()
                 val (payload, message) = if (locations.isNotEmpty()) {
                     Pair(locations, "Successfully retrieved locations")
                 } else {
                     Pair(locations, "Could not fetch locations")
                 }
+                log.info(message)
                 Response(
                         message = message,
-                        payload = payload,
-                        AccessToken = tokens["AccessToken"],
-                        RefreshToken = tokens["RefreshToken"]
+                        payload = payload
                 )
             }
         }
@@ -56,12 +55,13 @@ fun getSchema(): Schema {
                        pictureURI: String,
                        type: LocationType,
                        ctx: Context ->
-                val log = ctx.get<Logger>()
+                val log = ctx.get<Logger>()!!
+                val call = ctx.get<ApplicationCall>()!!
                 val tokens = ctx.get<Map<String, String>>() ?: mapOf("AccessToken" to null, "RefreshToken" to null)
                 val decodedTokens = AuthService.verifyToken(tokens)
                 if ((decodedTokens["AccessToken"] != null) && (decodedTokens["RefreshToken"] != null)) {
                     val accessToken = decodedTokens["AccessToken"] ?: error("No access Token")
-                    val owner = accessToken.getClaim("key").asString()
+                    val locationOwner = accessToken.getClaim("key").asString()
                     val addedLocation = LocationsServiceDynamo.addLocation(
                             name,
                             friendlyLocation,
@@ -69,7 +69,7 @@ fun getSchema(): Schema {
                             latitude,
                             longitude,
                             pictureURI,
-                            owner,
+                            locationOwner,
                             type
                     )
                     val (payload, message) = if (addedLocation != null) {
@@ -77,17 +77,14 @@ fun getSchema(): Schema {
                     } else {
                         Pair(listOf(addedLocation), "Failed to add location")
                     }
-                    val recodedTokens = AuthService.reEncodeTokens(decodedTokens)
+                    log.info(message)
+                    AuthService.setCookies(call, decodedTokens)
                     Response(message = message,
-                            payload = payload,
-                            AccessToken = recodedTokens["AccessToken"],
-                            RefreshToken = recodedTokens["RefreshToken"])
+                            payload = payload)
                 } else {
-                    val recodedTokens = AuthService.reEncodeTokens(decodedTokens)
+                    AuthService.setCookies(call, decodedTokens)
                     Response(message = "Not Authorized",
-                            payload = listOf(),
-                            AccessToken = recodedTokens["AccessToken"],
-                            RefreshToken = recodedTokens["RefreshToken"]) // maybe null tokens here?
+                            payload = listOf()) // maybe null tokens here?
                 }
             }
         }
@@ -103,7 +100,8 @@ fun getSchema(): Schema {
                        type: LocationType,
                        ctx: Context ->
 
-                val log = ctx.get<Logger>()
+                val log = ctx.get<Logger>()!!
+                val call = ctx.get<ApplicationCall>()!!
                 val tokens = ctx.get<Map<String, String>>() ?: mapOf("AccessToken" to null, "RefreshToken" to null)
                 val decodedTokens = AuthService.verifyToken(tokens)
                 if ((decodedTokens["AccessToken"] != null) && (decodedTokens["RefreshToken"] != null)) {
@@ -126,17 +124,14 @@ fun getSchema(): Schema {
                     } else {
                         Pair(listOf(updatedLocation), "Failed to update location")
                     }
-                    val recodedTokens = AuthService.reEncodeTokens(decodedTokens)
+                    log.info(message)
+                    AuthService.setCookies(call, decodedTokens)
                     Response(message = message,
-                            payload = payload,
-                            AccessToken = recodedTokens["AccessToken"],
-                            RefreshToken = recodedTokens["RefreshToken"])
+                            payload = payload)
                 } else {
-                    //val recodedTokens = AuthService.reEncodeTokens(decodedTokens)
+                    AuthService.setCookies(call, decodedTokens)
                     Response(message = "Not Authorized",
-                            payload = listOf(),
-                            AccessToken = null,
-                            RefreshToken = null) // maybe null tokens here?
+                            payload = listOf()) // maybe null tokens here?
                 }
             }
         }
@@ -144,11 +139,13 @@ fun getSchema(): Schema {
         mutation("deleteLocation") {
             resolver { id: String,
                        ctx: Context ->
-                val log = ctx.get<Logger>()
+                val call = ctx.get<ApplicationCall>()!!
+                val log = ctx.get<Logger>()!!
                 val tokens = ctx.get<Map<String, String>>() ?: mapOf("AccessToken" to null, "RefreshToken" to null)
                 val decodedTokens = AuthService.verifyToken(tokens)
                 if (decodedTokens["AccessToken"] != null && decodedTokens["RefreshToken"] != null) {
                     val accessToken = decodedTokens["AccessToken"] ?: error("No access Token")
+                    log.info(accessToken.getClaim("key").asString())
                     val deletedLocation = LocationsServiceDynamo.deleteLocation(
                             id,
                             accessToken.getClaim("key").asString()
@@ -159,17 +156,14 @@ fun getSchema(): Schema {
                     } else {
                         Pair(listOf(deletedLocation), "Failed to delete location")
                     }
-                    val recodedTokens = AuthService.reEncodeTokens(decodedTokens)
+                    log.info(message)
+                    AuthService.setCookies(call, decodedTokens)
                     Response(message = message,
-                            payload = payload,
-                            AccessToken = recodedTokens["AccessToken"],
-                            RefreshToken = recodedTokens["RefreshToken"])
+                            payload = payload)
                 } else {
-                    val recodedTokens = AuthService.reEncodeTokens(decodedTokens)
+                    AuthService.setCookies(call, decodedTokens)
                     Response(message = "Not Authorized",
-                            payload = listOf(),
-                            AccessToken = recodedTokens["AccessToken"],
-                            RefreshToken = recodedTokens["RefreshToken"]) // maybe null tokens here?
+                            payload = listOf()) // maybe null tokens here?
                 }
             }
         }
@@ -177,21 +171,27 @@ fun getSchema(): Schema {
         mutation("signIn") {
             resolver {
                 username: String,
-                password:String
+                password:String,
+                ctx: Context
                 ->
-                val response: Response
+                val call = ctx.get<ApplicationCall>()!!
+                val log = ctx.get<Logger>()!!
+                val response: AuthResponse
                 val tokens = AuthService.signIn(username, password)
                 response = if ((tokens["AccessToken"] != null) && (tokens["RefreshToken"] != null)) {
-                    Response("Successfully signed in",
-                            payload = listOf(),
+                    log.info("Successfully signed in")
+                    AuthResponse("Successfully signed in",
                             AccessToken = tokens["AccessToken"],
                             RefreshToken = tokens["RefreshToken"])
                 } else {
-                    Response("Sign in failed",
-                            payload = listOf(),
+                    log.info("Sign in failed")
+                    AuthResponse("Sign in failed",
                             AccessToken = tokens["AccessToken"],
                             RefreshToken = tokens["RefreshToken"])
                 }
+                //val encodedTokens = mapOf("AccessToken" to JWT.decode(tokens["AccessToken"]),
+                  //                          "RefreshToken" to JWT.decode(tokens["RefreshToken"]))
+                //AuthService.setCookies(call, encodedTokens)
                 response
             }
         }
@@ -199,21 +199,27 @@ fun getSchema(): Schema {
         mutation("signUp") {
             resolver {
                 username: String,
-                password:String
+                password:String,
+                ctx: Context
                 ->
-                val response: Response
+                val call = ctx.get<ApplicationCall>()!!
+                val response: AuthResponse
                 val tokens = AuthService.signUp(username, password)
                 response = if ((tokens["AccessToken"] != null) && (tokens["RefreshToken"] != null)) {
-                    Response("Successfully signed up",
-                            payload = listOf(),
+                    val encodedTokens = mapOf("AccessToken" to JWT.decode(tokens["AccessToken"]),
+                            "RefreshToken" to JWT.decode(tokens["RefreshToken"]))
+                    AuthService.setCookies(call, encodedTokens)
+                    AuthResponse("Successfully signed up",
                             AccessToken = tokens["AccessToken"],
                             RefreshToken = tokens["RefreshToken"])
                 } else {
-                    Response("Sign up failed",
-                            payload = listOf(),
+                    AuthResponse("Sign up failed",
                             AccessToken = tokens["AccessToken"],
                             RefreshToken = tokens["RefreshToken"])
+                    //AuthService.setCookies(call, mapOf("AccessToken" to null),
+                            //"RefreshToken" to null))
                 }
+
                 response
             }
         }

@@ -1,7 +1,9 @@
 package fnb.locations
 import com.apurebase.kgraphql.context
 import com.apurebase.kgraphql.schema.Schema
+import com.auth0.jwt.JWT
 import com.google.gson.Gson
+import fnb.locations.services.AuthService
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
 import io.ktor.routing.Route
@@ -27,18 +29,15 @@ data class GraphQLErrors(val e: Exception)
 
 fun Route.graphql(log: Logger, gson: Gson, schema: Schema) {
     post("/graphql") {
+        log.info("here")
         val request = call.receive<GraphQLRequest>()
-        val accessTkn = call.request.headers["AccessToken"] ?: "no-access-token"
-        val refreshTkn = call.request.headers["RefreshToken"] ?: "no-refresh-token"
 
-        val tokens = mapOf(
-                "AccessToken" to accessTkn,
-                "RefreshToken" to refreshTkn
-        )
+        val tokens = AuthService.getCookiesOrAccessTokens(call)
 
         val ctx = context {
             +tokens
             +log
+            +call
         }
 
         val query = request.query
