@@ -13,6 +13,10 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.JWTVerificationException
 import com.auth0.jwt.exceptions.TokenExpiredException
 import com.auth0.jwt.interfaces.DecodedJWT
+import fnb.locations.model.DecodedTokens
+import fnb.locations.model.EncodedTokens
+import fnb.locations.model.User
+import fnb.locations.model.UserPermissionLevel
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
 import io.ktor.application.ApplicationCall
@@ -40,38 +44,31 @@ object AuthService {
      * a map of AccessToken to null
      * and RefreshToken to null token if unsuccessful
      */
-    fun signIn(username: String, password: String): Map<String, String?> {
+    fun signIn(call: ApplicationCall, username: String, password: String): EncodedTokens {
         return try {
             // search dynamo for match
             val user = getUserInfo(username)
 
-            if (password != user["password"]?.s.toString()) return mapOf(
-                    "AccessToken" to null,
-                    "RefreshToken" to null
+            if (password != user.password) error("Password incorrect")
+
+            val permissionLevel = user.permissionLevel
+            val count = user.count
+
+            val accessToken = signAccessToken(username, permissionLevel.toString())
+            val refreshToken = signRefreshToken(username, permissionLevel.toString(), count)
+
+            setCookies(call, DecodedTokens(JWT.decode(accessToken), JWT.decode(refreshToken)))
+
+            EncodedTokens(
+                    AccessToken = accessToken,
+                    RefreshToken = refreshToken
             )
 
-            val permissionLevel = user["permissionLevel"]
-            val count = user["count"]
-
-            val accessToken = if (permissionLevel != null) {
-                signAccessToken(username, permissionLevel.s)
-            } else {
-                signAccessToken(username)
-            }
-
-            val refreshToken = if ((permissionLevel != null) && (count != null)) {
-                signRefreshToken(username, permissionLevel.s, count.n.toInt())
-            } else {
-                signRefreshToken(username)
-            }
-            mapOf(
-                    "AccessToken" to accessToken,
-                    "RefreshToken" to refreshToken
-            )
         } catch (t: Throwable) {
-            mapOf(
-                    "AccessToken" to null,
-                    "RefreshToken" to null
+            setCookies(call, DecodedTokens(null, null))
+            EncodedTokens(
+                    AccessToken = null,
+                    RefreshToken = null
             )
         }
     }
@@ -85,109 +82,118 @@ object AuthService {
      * a map of AccessToken to null
      * and RefreshToken to null token if unsuccessful
      */
-    fun signUp(username: String, password: String, permissionLevel: String = "USER"): Map<String, String?> {
-        val item = mapOf(
-            "username" to AttributeValue().apply { s = username },
-            "password" to AttributeValue().apply { s = password },
-            "count" to AttributeValue().apply { n = "0" },
-            "permissionLevel" to AttributeValue().apply { s = permissionLevel }
-        )
+    fun signUp(call: ApplicationCall, username: String, password: String, permissionLevel: String = "USER"): EncodedTokens {
+        return try {
+           val item = mapOf(
+                "username" to AttributeValue().apply { s = username },
+                "password" to AttributeValue().apply { s = password },
+                "count" to AttributeValue().apply { n = "0" },
+                "permissionLevel" to AttributeValue().apply { s = permissionLevel }
+            )
 
-        val req = PutItemRequest()
-            .withTableName(tableName)
-            .withItem(item)
-            .withReturnValues(ReturnValue.ALL_OLD)
+            val req = PutItemRequest()
+                .withTableName(tableName)
+                .withItem(item)
+                .withReturnValues(ReturnValue.ALL_OLD)
 
 
-        var returnValue: Map<String, String?> = mapOf(
-            "AccessToken" to null,
-            "RefreshToken" to null
-        )
+            var returnValue = EncodedTokens (
+                    AccessToken = null,
+                    RefreshToken = null
+            )
 
-        if (client.putItem(req).sdkHttpMetadata.httpStatusCode == 200) {
-            returnValue = mapOf(
-                "AccessToken" to signAccessToken(username),
-                "RefreshToken" to signRefreshToken(username)
+            if (client.putItem(req).sdkHttpMetadata.httpStatusCode == 200) {
+                returnValue = EncodedTokens(
+                    AccessToken = signAccessToken(username),
+                    RefreshToken = signRefreshToken(username)
+                )
+            }
+
+            setCookies(call, DecodedTokens(
+                    JWT.decode(returnValue.AccessToken),
+                    JWT.decode(returnValue.RefreshToken))
+
+            )
+            returnValue
+        } catch (t: Throwable) {
+            setCookies(call, DecodedTokens(null, null))
+            EncodedTokens (
+                    AccessToken = null,
+                    RefreshToken = null
             )
         }
-        return returnValue
     }
 
     /**
-     * Method verifies that access token is correct and returns both tokens decoded.
-     * If access token is invalid the refresh token is checked.
-     * if the refresh token is valid a new access token is granted.
-     * If the refresh token and access token are invalid null values are returns
+     * Method verifies that tokens are correct and returns access tokens decoded.
+     * If access token and refresh token are valid decoded access token is returned.
+     * if access token is invalid and refresh token is valid a new access token is granted.
+     * and both tokens are reset
+     * If the refresh token and access token are invalid null is returns
+     * cookies are set to the cookies if they are verified, null otherwise
      *
-     * @param tokens a map of AccessToken to the provided access token
+     * @param encodedTokens a map of AccessToken to the provided access token
      * and RefreshToken to the provided refresh token
      *
-     * @return a map of AccessToken to the decoded access token in JsonNode form
-     * and RefreshToken to the decoded refresh token in JsonNode form
-     * a map of AccessToken to null
-     * and RefreshToken to null token if unsuccessful
+     * @return a decoded AccessToken if verified. null otherwise
      */
-    fun verifyToken(tokens: Map<String, String?>): Map<String, DecodedJWT?> {
-        return try {
-            mapOf(
-                "AccessToken" to verifier.verify(JWT.decode(tokens["AccessToken"])),
-                "RefreshToken" to verifier.verify(JWT.decode(tokens["RefreshToken"]))
-            )
+    fun verifyToken(call: ApplicationCall): DecodedJWT? {
+        val encodedTokens = getCookiesOrAccessTokens(call)
+        val (accessToken, refreshToken) = try {
+
+            val accessToken = verifier.verify(JWT.decode(encodedTokens.AccessToken))
+            val refreshToken = verifier.verify(JWT.decode(encodedTokens.RefreshToken))
+            Pair(accessToken, refreshToken)
+
         } catch (e: TokenExpiredException) {
             try {
-                val refreshTkn = verifier.verify(tokens["RefreshToken"])
-                val username = refreshTkn.getClaim("key").asString()
-                val tokenCount = refreshTkn.getClaim("count").asInt()
-                val tokenPermissionLevel = refreshTkn.getClaim("permissionLevel").asString()
+                val refreshToken = verifier.verify(encodedTokens.RefreshToken)
+                val username = refreshToken.getClaim("key").asString()
+                val tokenCount = refreshToken.getClaim("count").asInt()
+                val tokenPermissionLevel = refreshToken.getClaim("permissionLevel").asString()
                 val userInfo = getUserInfo(username)
 
-                val returnTokens: Map<String, DecodedJWT?> = if (userInfo["count"]?.n.toString().toInt() == tokenCount) {
-                    mapOf(
-                        "AccessToken" to verifier.verify(
-                                signAccessToken(username, tokenPermissionLevel)
-                        ),
-                        "RefreshToken" to refreshTkn
-                    )
+                val accessToken = if (userInfo.count == tokenCount) {
+                    verifier.verify(signAccessToken(username, tokenPermissionLevel))
                 } else {
-                    mapOf(
-                        "AccessToken" to null,
-                        "RefreshToken" to null
-                    )
+                    null
                 }
-
-                returnTokens
-            } catch (e: JWTVerificationException) {
-                mapOf( "AccessToken" to null,
-                       "RefreshToken" to null
+                val newRefreshToken = JWT.decode(
+                        signRefreshToken(
+                                username,
+                                count = tokenCount,
+                                permissionLevel = tokenPermissionLevel)
                 )
+                Pair(accessToken, newRefreshToken)
+            } catch (e: JWTVerificationException) {
+                Pair(null, null)
             }
         } catch (e: Exception) {
-            mapOf( "AccessToken" to null,
-                   "RefreshToken" to null
-            )
+            Pair(null, null)
         }
+
+        setCookies(call, DecodedTokens(AccessToken = accessToken, RefreshToken = refreshToken))
+        return accessToken
     }
 
-    fun setCookies(call: ApplicationCall, tokens: Map<String, DecodedJWT?>) {
-        call.response.cookies.append("fnb-AccessToken-Payload",
-                tokens["AccessToken"]?.header + '.' + tokens["AccessToken"]?.payload.toString())
-        call.response.cookies.append("fnb-AccessToken-Signature",
-                tokens["AccessToken"]?.signature.toString(), httpOnly = true)
+    /**
+     * @param call The ApplicationCall that has access to cookies
+     * @param decodedTokens the tokens that will be used to set the cookies
+     */
 
-        call.response.cookies.append("fnb-RefreshToken-Payload",
-                tokens["RefreshToken"]?.header + '.' + tokens["RefreshToken"]?.payload.toString())
-        call.response.cookies.append("fnb-RefreshToken-Signature",
-                tokens["RefreshToken"]?.signature.toString(), httpOnly = true)
-    }
 
     fun invalidateRefreshToken(username: String): String {
         val user = getUserInfo(username)
-        val count = user["count"]?.n.toString().toInt()
+        val count = user.count
         val newCount = (count + 1) % Int.MAX_VALUE
         return ""//TODO
     }
 
-    fun getCookiesOrAccessTokens(call: ApplicationCall):Map<String, String> {
+    /**
+     * @param call The ApplicationCall that has access to cookies
+     * @return returns the cookies as strings in an EncodedTokens data class
+     */
+    private fun getCookiesOrAccessTokens(call: ApplicationCall): EncodedTokens {
 
         val accessPayload = call.request.cookies["fnb-AccessToken-Payload"] ?: "<empty>"
         val accessSig = call.request.cookies["fnb-AccessToken-Signature"] ?: "<empty>"
@@ -200,31 +206,36 @@ object AuthService {
         if ("<empty>" in refreshToken) { refreshToken = call.request.headers["RefreshToken"] ?: "no-refresh-token" }
         if ("<empty>" in accessToken) { accessToken = call.request.headers["AccessToken"] ?: "no-access-token" }
 
-        return mapOf("AccessToken" to accessToken,
-                   "RefreshToken" to refreshToken)
+        return EncodedTokens(
+                AccessToken = accessToken,
+                RefreshToken = refreshToken
+        )
     }
 
-    /**
-     * @param tokens a map of AccessToken to the decoded token as json
-     * and Refresh token to the decoded token as json
-     *
-     * @return a map of AccessToken to the encoded token as a string
-     * and Refresh token to the encoded token as string
-     */
-    fun reEncodeTokens(tokens: Map<String, DecodedJWT?>): Map<String, String> {
-        val refreshToken = tokens["RefreshToken"] ?: error("No access token provided")
-        val accessToken = tokens["AccessToken"] ?: error("No refresh token provided")
-        return mapOf(
-                "RefreshToken" to signRefreshToken(
-                        refreshToken.getClaim("key").asString(),
-                        refreshToken.getClaim("permissionLevel").asString(),
-                        refreshToken.getClaim("count").asInt()
-                ),
-                "AccessToken" to signAccessToken(
-                        accessToken.getClaim("key").asString(),
-                        accessToken.getClaim("permissionLevel").asString()
-                )
-        )
+    private fun setCookies(call: ApplicationCall, decodedTokens: DecodedTokens) {
+        if (decodedTokens.AccessToken != null) {
+            call.response.cookies.append("fnb-AccessToken-Payload",
+                    "${decodedTokens.AccessToken.header}.${decodedTokens.AccessToken.payload.toString()}")
+            call.response.cookies.append("fnb-AccessToken-Signature",
+                    decodedTokens.AccessToken.signature.toString(), httpOnly = true)
+        } else {
+            call.response.cookies.append("fnb-AccessToken-Payload",
+                    "")
+            call.response.cookies.append("fnb-AccessToken-Signature",
+                    "", httpOnly = true)
+        }
+
+        if (decodedTokens.RefreshToken != null) {
+            call.response.cookies.append("fnb-RefreshToken-Payload",
+                    "${decodedTokens.RefreshToken.header}.${decodedTokens.RefreshToken.payload.toString()}")
+            call.response.cookies.append("fnb-RefreshToken-Signature",
+                    decodedTokens.RefreshToken.signature.toString(), httpOnly = true)
+        } else {
+            call.response.cookies.append("fnb-RefreshToken-Payload",
+                    "")
+            call.response.cookies.append("fnb-RefreshToken-Signature",
+                    "", httpOnly = true)
+        }
     }
 
     private fun signAccessToken(username: String, permissionLevel: String? = null): String {
@@ -232,8 +243,9 @@ object AuthService {
             this.time = Date()
             this.add(Calendar.MINUTE, 5)
         }.time
+
         val actualPermissionLevel: String = permissionLevel ?:
-            getUserInfo(username)["PermissionLevel"]?.s.toString()
+            getUserInfo(username).permissionLevel.toString()
 
         return JWT.create()
             .withIssuer(username)
@@ -251,13 +263,11 @@ object AuthService {
             this.add(Calendar.MINUTE, 8440)
         }.time
 
-
-
         val actualPermissionLevel: String = permissionLevel ?:
-            getUserInfo(username)["permissionLevel"]?.s.toString()
+            getUserInfo(username).permissionLevel.toString()
 
-        val actualCount: Int = count ?:
-            getUserInfo(username)["count"]?.n.toString().toInt()
+        val actualCount = count ?:
+            getUserInfo(username).count
 
         return JWT.create()
             .withIssuer(username)
@@ -268,12 +278,25 @@ object AuthService {
             .sign(algorithm)
     }
 
-    private fun getUserInfo(username: String): Map<String, AttributeValue> {
+    /**
+     * @param username unique username associated with each user
+     * @return a user object that describes the requested user, and null if no such user exists
+     */
+    private fun getUserInfo(username: String): User {
+
         val req = GetItemRequest().withKey(mapOf(
-            "username" to AttributeValue().apply { s = username }
+                "username" to AttributeValue().apply { s = username }
         )).withTableName(tableName)
 
-        return LocationsServiceDynamo.client.getItem(req).item ?: error("user does not exist")
+        val userMap = LocationsServiceDynamo.client.getItem(req).item ?: error("user does not exist")
+
+        return User(
+                username = userMap["username"]?.s.toString(),
+                password = userMap["password"]?.s.toString(),
+                count = userMap["count"]?.n.toString().toInt(),
+                permissionLevel = UserPermissionLevel.valueOf(userMap["permissionLevel"]?.s.toString())
+        )
+
     }
 
 }

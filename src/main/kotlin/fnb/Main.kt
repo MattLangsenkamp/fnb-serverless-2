@@ -41,7 +41,6 @@ fun Application.main() {
         allowCredentials = true
         anyHost()
         host("*")
-        //anyHost()
     }
     install(ContentNegotiation) {
         gson {
