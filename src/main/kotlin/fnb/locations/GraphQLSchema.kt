@@ -61,9 +61,9 @@ fun getSchema(): Schema {
                        type: LocationType,
                        ctx: Context ->
                 val log = ctx.get<Logger>()!!
-                val accessToken = ctx.get<DecodedJWT>()
+                val accessToken = ctx.get<Any>()
 
-                if (accessToken != null) {
+                if (accessToken != null && accessToken is DecodedJWT) {
                     val locationOwner = accessToken.getClaim("key").asString()
                     val addedLocation = LocationsServiceDynamo.addLocation(
                             name,
@@ -102,9 +102,9 @@ fun getSchema(): Schema {
                        ctx: Context ->
 
                 val log = ctx.get<Logger>()!!
-                val accessToken = ctx.get<DecodedJWT>()
+                val accessToken = ctx.get<Any>()
 
-                if (accessToken != null) {
+                if (accessToken != null && accessToken is DecodedJWT) {
                     val updatedLocation = LocationsServiceDynamo.updateLocation(Location(
                             id,
                             name,
@@ -136,8 +136,8 @@ fun getSchema(): Schema {
             resolver { id: String,
                        ctx: Context ->
                 val log = ctx.get<Logger>()!!
-                val accessToken = ctx.get<DecodedJWT>()
-                if (accessToken != null) {
+                val accessToken = ctx.get<Any>()
+                if (accessToken != null && accessToken is DecodedJWT) {
                     log.info(accessToken.getClaim("key").asString())
                     val deletedLocation = LocationsServiceDynamo.deleteLocation(
                             id,
@@ -167,7 +167,7 @@ fun getSchema(): Schema {
                 ->
                 val call = ctx.get<ApplicationCall>()!!
                 val log = ctx.get<Logger>()!!
-                val tokens = AuthService.signIn(username, password)
+                val tokens = AuthService.signIn(call, username, password)
                 val message = if ((tokens.AccessToken != null) && (tokens.RefreshToken != null)) {
                     "Successfully signed in"
                 } else {
@@ -187,7 +187,7 @@ fun getSchema(): Schema {
                 ctx: Context
                 ->
                 val call = ctx.get<ApplicationCall>()!!
-                val tokens = AuthService.signUp(username, password)
+                val tokens = AuthService.signUp(call, username, password)
                 val message = if ((tokens.AccessToken != null) && (tokens.RefreshToken != null)) {
                     "sign up successful"
                 } else {

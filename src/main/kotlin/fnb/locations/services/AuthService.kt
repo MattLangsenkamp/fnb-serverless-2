@@ -17,6 +17,7 @@ import fnb.locations.model.DecodedTokens
 import fnb.locations.model.EncodedTokens
 import fnb.locations.model.User
 import fnb.locations.model.UserPermissionLevel
+import fnb.logging.MyLogger
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
 import io.ktor.application.ApplicationCall
@@ -40,9 +41,8 @@ object AuthService {
      * @param password the password of the user signing up
      *
      * @return a map of AccessToken to the encoded access token
-     * and RefreshToken to the encoded refresh token
-     * a map of AccessToken to null
-     * and RefreshToken to null token if unsuccessful
+     * a EncodedTokens object with no null values if sign in successful
+     * a EncodedTokens object with two null values if unsuccessful
      */
     fun signIn(call: ApplicationCall, username: String, password: String): EncodedTokens {
         return try {
@@ -74,21 +74,24 @@ object AuthService {
     }
 
     /**
-     * @param username the username of the user signing in
-     * @param password the password of the user signing in
+     * @param username the username of the user signing up
+     * @param password the password of the user signing up
+     * @param permissionLevel the permission level of the user
      *
      * @return a map of AccessToken to the encoded access token
-     * and RefreshToken to the encoded refresh token if successful
-     * a map of AccessToken to null
-     * and RefreshToken to null token if unsuccessful
+     * a EncodedTokens object with no null values if sign in successful
+     * a EncodedTokens object with two null values if unsuccessful
      */
-    fun signUp(call: ApplicationCall, username: String, password: String, permissionLevel: String = "USER"): EncodedTokens {
+    fun signUp(call: ApplicationCall,
+               username: String,
+               password: String,
+               permissionLevel: UserPermissionLevel = UserPermissionLevel.USER): EncodedTokens {
         return try {
            val item = mapOf(
                 "username" to AttributeValue().apply { s = username },
                 "password" to AttributeValue().apply { s = password },
                 "count" to AttributeValue().apply { n = "0" },
-                "permissionLevel" to AttributeValue().apply { s = permissionLevel }
+                "permissionLevel" to AttributeValue().apply { s = permissionLevel.toString() }
             )
 
             val req = PutItemRequest()
@@ -176,12 +179,6 @@ object AuthService {
         return accessToken
     }
 
-    /**
-     * @param call The ApplicationCall that has access to cookies
-     * @param decodedTokens the tokens that will be used to set the cookies
-     */
-
-
     fun invalidateRefreshToken(username: String): String {
         val user = getUserInfo(username)
         val count = user.count
@@ -192,6 +189,7 @@ object AuthService {
     /**
      * @param call The ApplicationCall that has access to cookies
      * @return returns the cookies as strings in an EncodedTokens data class
+     * EncodedTokens class will have null values if no tokens present
      */
     private fun getCookiesOrAccessTokens(call: ApplicationCall): EncodedTokens {
 
@@ -205,13 +203,17 @@ object AuthService {
 
         if ("<empty>" in refreshToken) { refreshToken = call.request.headers["RefreshToken"] ?: "no-refresh-token" }
         if ("<empty>" in accessToken) { accessToken = call.request.headers["AccessToken"] ?: "no-access-token" }
-
+        MyLogger.logger?.info("yooooooo")
         return EncodedTokens(
                 AccessToken = accessToken,
                 RefreshToken = refreshToken
         )
     }
 
+    /**
+     * @param call The ApplicationCall that has access to cookies
+     * @param decodedTokens DecodedTokens class that represents the cookies
+     */
     private fun setCookies(call: ApplicationCall, decodedTokens: DecodedTokens) {
         if (decodedTokens.AccessToken != null) {
             call.response.cookies.append("fnb-AccessToken-Payload",

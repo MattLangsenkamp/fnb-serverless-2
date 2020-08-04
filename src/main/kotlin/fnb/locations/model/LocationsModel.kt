@@ -1,6 +1,5 @@
 package fnb.locations.model
 
-
 data class Location(val id: String,
                     val name: String,
                     val friendlyLocation: String,
