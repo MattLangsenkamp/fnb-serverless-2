@@ -1,5 +1,4 @@
-package fnb.locations
-
+package fnb.locations.model
 
 data class Location(val id: String,
                     val name: String,
@@ -22,9 +21,4 @@ enum class LocationType {
 
 data class Response(val message: String,
                     val payload: List<Location?>
-)
-
-data class AuthResponse(val message: String,
-                    val AccessToken: String?,
-                    val RefreshToken: String?
 )

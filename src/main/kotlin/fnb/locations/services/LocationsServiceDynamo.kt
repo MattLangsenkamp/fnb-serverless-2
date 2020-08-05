@@ -4,8 +4,8 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder
 import io.kotless.dsl.lang.DynamoDBTable
 import com.amazonaws.services.dynamodbv2.model.*
-import fnb.locations.Location
-import fnb.locations.LocationType
+import fnb.locations.model.Location
+import fnb.locations.model.LocationType
 import io.kotless.PermissionLevel
 import java.util.UUID
 

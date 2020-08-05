@@ -2,8 +2,10 @@ package fnb.locations
 import com.apurebase.kgraphql.context
 import com.apurebase.kgraphql.schema.Schema
 import com.auth0.jwt.JWT
+import com.auth0.jwt.interfaces.DecodedJWT
 import com.google.gson.Gson
 import fnb.locations.services.AuthService
+import fnb.logging.MyLogger
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
 import io.ktor.routing.Route
@@ -29,11 +31,12 @@ data class GraphQLErrors(val e: Exception)
 
 fun Route.graphql(log: Logger, gson: Gson, schema: Schema) {
     post("/graphql") {
-        log.info("here")
         val request = call.receive<GraphQLRequest>()
-
-        val tokens = AuthService.getCookiesOrAccessTokens(call)
-
+        // the k-graphql schema will try and grab a Decoded Jwt. if the tokens are not present or invalid then
+        // it will pick up a null object instead.
+        val tokens = AuthService.verifyToken(call) ?: "invalid"
+        MyLogger.logger = log
+        MyLogger.logger?.info("hey")
         val ctx = context {
             +tokens
             +log
