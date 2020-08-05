@@ -3,10 +3,7 @@ package fnb.locations.services
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder
-import com.amazonaws.services.dynamodbv2.model.AttributeValue
-import com.amazonaws.services.dynamodbv2.model.GetItemRequest
-import com.amazonaws.services.dynamodbv2.model.PutItemRequest
-import com.amazonaws.services.dynamodbv2.model.ReturnValue
+import com.amazonaws.services.dynamodbv2.model.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.JWTVerifier
 import com.auth0.jwt.algorithms.Algorithm
@@ -40,9 +37,8 @@ object AuthService {
      * @param username the username of the user signing up
      * @param password the password of the user signing up
      *
-     * @return a map of AccessToken to the encoded access token
-     * a EncodedTokens object with no null values if sign in successful
-     * a EncodedTokens object with two null values if unsuccessful
+     * @return EncodedTokens object with no null values if sign in successful
+     * EncodedTokens object with two null values if unsuccessful
      */
     fun signIn(call: ApplicationCall, username: String, password: String): EncodedTokens {
         return try {
@@ -78,9 +74,8 @@ object AuthService {
      * @param password the password of the user signing up
      * @param permissionLevel the permission level of the user
      *
-     * @return a map of AccessToken to the encoded access token
-     * a EncodedTokens object with no null values if sign in successful
-     * a EncodedTokens object with two null values if unsuccessful
+     * @return EncodedTokens object with no null values if sign in successful
+     * EncodedTokens object with two null values if unsuccessful
      */
     fun signUp(call: ApplicationCall,
                username: String,
@@ -179,11 +174,29 @@ object AuthService {
         return accessToken
     }
 
-    fun invalidateRefreshToken(username: String): String {
+    /**
+     *
+     * adds to the count of the specified user so that if the refresh token is inspected it will not match and will not
+     * validate
+     *
+     * @param username user to invalidate
+     */
+    fun invalidateRefreshToken(username: String) {
         val user = getUserInfo(username)
         val count = user.count
         val newCount = (count + 1) % Int.MAX_VALUE
-        return ""//TODO
+        val map = mapOf(
+            "count" to AttributeValueUpdate().withValue(AttributeValue().apply { n = newCount.toString() })
+        )
+        val req = UpdateItemRequest()
+                .withConditionExpression("#username = :username")
+                .withExpressionAttributeValues(mapOf(":username" to AttributeValue().apply { s =  username }))
+                .withAttributeUpdates(map)
+                .withTableName(tableName)
+                .withKey(mapOf("username" to AttributeValue().apply { s = username}))
+                .withReturnValues(ReturnValue.UPDATED_NEW)
+        val res = LocationsServiceDynamo.client.updateItem(req)
+        if (res.sdkHttpMetadata.httpStatusCode != 200) error("could not invalidate refresh token")
     }
 
     /**
