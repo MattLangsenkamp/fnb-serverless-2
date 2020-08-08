@@ -1,0 +1,161 @@
+package mocks
+
+import fnb.locations.model.Location
+import fnb.locations.model.LocationType
+import fnb.locations.services.LocationsServiceDynamo
+import io.mockk.every
+import io.mockk.mockk
+
+fun get_location_service_with_valid_data(): LocationsServiceDynamo {
+    val mock = mockk<LocationsServiceDynamo>()
+
+    val name = location.name
+    val friendlyLocation = location.friendlyLocation
+    val description = location.description
+    val locationOwner = location.locationOwner
+    val latitude = location.latitude
+    val longitude = location.longitude
+    val pictureURI = location.pictureURI
+    val type = location.type
+
+    // add
+    every { mock.addLocation(
+        name = name,
+        friendlyLocation = friendlyLocation,
+        description = description,
+        locationOwner = locationOwner,
+        latitude = latitude,
+        longitude = longitude,
+        pictureURI = pictureURI,
+        type = type
+        )
+    } returns Location(
+        id = "0000",
+        name = name,
+        friendlyLocation = friendlyLocation,
+        description = description,
+        locationOwner = locationOwner,
+        latitude = latitude,
+        longitude = longitude,
+        pictureURI = pictureURI,
+        type = type
+    )
+
+    // update
+    every { mock.updateLocation(Location(
+            id = "0000",
+            name = name,
+            friendlyLocation = friendlyLocation,
+            description = description,
+            locationOwner = locationOwner,
+            latitude = latitude,
+            longitude = longitude,
+            pictureURI = pictureURI,
+            type = type
+            )
+        )
+    } returns Location(
+        id = "0000",
+        name = name,
+        friendlyLocation = friendlyLocation,
+        description = description,
+        locationOwner = locationOwner,
+        latitude = latitude,
+        longitude = longitude,
+        pictureURI = pictureURI,
+        type = type
+    )
+
+    // delete
+    every { mock.deleteLocation(id = "0000", locationOwner = locationOwner)
+    } returns Location(
+        id = "0000",
+        name = name,
+        friendlyLocation = friendlyLocation,
+        description = description,
+        locationOwner = locationOwner,
+        latitude = latitude,
+        longitude = longitude,
+        pictureURI = pictureURI,
+        type = type
+    )
+
+    every { mock.getLocation(id = "0000")
+    } returns Location(
+        id = "0000",
+        name = name,
+        friendlyLocation = friendlyLocation,
+        description = description,
+        locationOwner = locationOwner,
+        latitude = latitude,
+        longitude = longitude,
+        pictureURI = pictureURI,
+        type = type
+    )
+
+    every { mock.getAllLocations()
+    } returns listOf(Location(
+        id = "0000",
+        name = name,
+        friendlyLocation = friendlyLocation,
+        description = description,
+        locationOwner = locationOwner,
+        latitude = latitude,
+        longitude = longitude,
+        pictureURI = pictureURI,
+        type = type
+    ))
+    return mock
+}
+
+fun get_location_service_that_is_not_authenticated(): LocationsServiceDynamo {
+    val mock = mockk<LocationsServiceDynamo>()
+
+    val name = "first food stand"
+    val friendlyLocation = "corner of X and Y"
+    val description = "A place to get and leave free food"
+    val locationOwner = "matt lang"
+    val latitude = 0.0
+    val longitude = 0.0
+    val pictureURI = "s3:/sure"
+    val type = LocationType.FREE_FOOD_STAND
+
+    // add
+    every { mock.addLocation(
+        name = name,
+        friendlyLocation = friendlyLocation,
+        description = description,
+        locationOwner = locationOwner,
+        latitude = latitude,
+        longitude = longitude,
+        pictureURI = pictureURI,
+        type = type
+    )
+    } returns null
+
+    // update
+    every { mock.updateLocation(Location(
+        id = "0000",
+        name = name,
+        friendlyLocation = friendlyLocation,
+        description = description,
+        locationOwner = locationOwner,
+        latitude = latitude,
+        longitude = longitude,
+        pictureURI = pictureURI,
+        type = type)
+    )
+    } returns null
+
+    // delete
+    every { mock.deleteLocation(id = "0000", locationOwner = locationOwner)
+    } returns null
+
+    every { mock.getLocation(id = "0000")
+    } returns null
+
+    every { mock.getAllLocations()
+    } returns listOf(null)
+
+    return mock
+}

@@ -18,18 +18,20 @@ import fnb.logging.MyLogger
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
 import io.ktor.application.ApplicationCall
+import org.koin.core.KoinComponent
+import org.koin.core.get
 import java.util.*
 
 
 private const val tableName: String = "fnb-auth"
 
 @DynamoDBTable(tableName, PermissionLevel.ReadWrite)
-object AuthService {
-    private val client: AmazonDynamoDB = AmazonDynamoDBClientBuilder
+class AuthService(private val client: AmazonDynamoDB) {
+    /*private val client: AmazonDynamoDB = AmazonDynamoDBClientBuilder
             .standard()
             .withCredentials(ProfileCredentialsProvider("fnb-admin"))
-            .build()
-    private const val secret: String = "FakeSecret"
+            .build()*/
+    private val secret: String = "FakeSecret"
     private val algorithm: Algorithm = Algorithm.HMAC256(secret)
     private val verifier: JWTVerifier = JWT.require(algorithm).build()
 
@@ -195,7 +197,7 @@ object AuthService {
                 .withTableName(tableName)
                 .withKey(mapOf("username" to AttributeValue().apply { s = username}))
                 .withReturnValues(ReturnValue.UPDATED_NEW)
-        val res = LocationsServiceDynamo.client.updateItem(req)
+        val res = client.updateItem(req)
         if (res.sdkHttpMetadata.httpStatusCode != 200) error("could not invalidate refresh token")
     }
 
@@ -303,7 +305,7 @@ object AuthService {
                 "username" to AttributeValue().apply { s = username }
         )).withTableName(tableName)
 
-        val userMap = LocationsServiceDynamo.client.getItem(req).item ?: error("user does not exist")
+        val userMap = client.getItem(req).item ?: error("user does not exist")
 
         return User(
                 username = userMap["username"]?.s.toString(),

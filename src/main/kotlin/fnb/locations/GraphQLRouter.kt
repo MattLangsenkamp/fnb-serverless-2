@@ -13,6 +13,7 @@ import io.ktor.application.call
 import io.ktor.request.receive
 import io.ktor.response.respondText
 import io.ktor.routing.post
+import org.koin.ktor.ext.inject
 import org.slf4j.Logger
 
 private const val tableName: String = "fnb-data"
@@ -29,12 +30,12 @@ fun GraphQLErrors.asMap(): Map<String, Map<String, String>> {
 
 data class GraphQLErrors(val e: Exception)
 
-fun Route.graphql(log: Logger, gson: Gson, schema: Schema) {
+fun Route.graphql(log: Logger, gson: Gson, schema: Schema, authService: AuthService) {
     post("/graphql") {
         val request = call.receive<GraphQLRequest>()
         // the k-graphql schema will try and grab a Decoded Jwt. if the tokens are not present or invalid then
         // it will pick up a null object instead.
-        val tokens = AuthService.verifyToken(call) ?: "invalid"
+        val tokens = authService.verifyToken(call) ?: "invalid"
         MyLogger.logger = log
         MyLogger.logger?.info("hey")
         val ctx = context {
