@@ -37,7 +37,7 @@ fun Route.graphql(log: Logger, gson: Gson, schema: Schema, authService: AuthServ
         // it will pick up a null object instead.
         val tokens = authService.verifyToken(call) ?: "invalid"
         MyLogger.logger = log
-        MyLogger.logger?.info("hey")
+
         val ctx = context {
             +tokens
             +log
@@ -52,6 +52,7 @@ fun Route.graphql(log: Logger, gson: Gson, schema: Schema, authService: AuthServ
 
         try {
             val result = schema.execute(query, variables = variables, context = ctx)
+           log.info("the result: $result")
             call.respondText(result)
         } catch (e: Exception) {
             call.respondText(gson.toJson(GraphQLErrors(e).asMap()))
