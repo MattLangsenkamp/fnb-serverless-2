@@ -1,0 +1,164 @@
+package mocks
+
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
+import io.ktor.application.ApplicationCall
+import io.mockk.every
+import io.mockk.mockk
+import java.util.*
+
+fun get_valid_application_call(): ApplicationCall {
+    val mock = mockk<ApplicationCall>()
+
+    val accessToken = mocks.signAccessToken(user.username, user.permissionLevel.toString())
+    val refreshToken = mocks.signRefreshToken(user.username, user.permissionLevel.toString(), user.count)
+
+    every { mock.request.cookies["fnb-AccessToken-Payload"] } returns JWT.decode(accessToken).payload
+    every { mock.request.cookies["fnb-AccessToken-Signature"] } returns JWT.decode(accessToken).signature
+    every { mock.request.cookies["fnb-RefreshToken-Payload"] } returns JWT.decode(refreshToken).payload
+    every { mock.request.cookies["fnb-RefreshToken-Signature"] } returns JWT.decode(refreshToken).signature
+    every { mock.request.headers["RefreshToken"] } returns accessToken
+    every { mock.request.headers["AccessToken"] } returns refreshToken
+
+    return mock
+}
+
+fun get_valid_application_call_with_expired_access_token(): ApplicationCall {
+    val mock = mockk<ApplicationCall>()
+    val accessToken = mocks.signAccessTokenExpired(user.username, user.permissionLevel.toString())
+    val refreshToken = mocks.signRefreshToken(user.username, user.permissionLevel.toString(), user.count)
+
+    every { mock.request.cookies["fnb-AccessToken-Payload"] } returns JWT.decode(accessToken).payload
+    every { mock.request.cookies["fnb-AccessToken-Signature"] } returns JWT.decode(accessToken).signature
+    every { mock.request.cookies["fnb-RefreshToken-Payload"] } returns JWT.decode(refreshToken).payload
+    every { mock.request.cookies["fnb-RefreshToken-Signature"] } returns JWT.decode(refreshToken).signature
+    every { mock.request.headers["RefreshToken"] } returns accessToken
+    every { mock.request.headers["AccessToken"] } returns refreshToken
+
+    return mock
+}
+
+fun get_valid_application_call_with_expired_refresh_token(): ApplicationCall {
+    val mock = mockk<ApplicationCall>()
+    val accessToken = mocks.signAccessToken(user.username, user.permissionLevel.toString())
+    val refreshToken = mocks.signRefreshTokenExpired(user.username, user.permissionLevel.toString(), user.count)
+
+    every { mock.request.cookies["fnb-AccessToken-Payload"] } returns JWT.decode(accessToken).payload
+    every { mock.request.cookies["fnb-AccessToken-Signature"] } returns JWT.decode(accessToken).signature
+    every { mock.request.cookies["fnb-RefreshToken-Payload"] } returns JWT.decode(refreshToken).payload
+    every { mock.request.cookies["fnb-RefreshToken-Signature"] } returns JWT.decode(refreshToken).signature
+    every { mock.request.headers["RefreshToken"] } returns accessToken
+    every { mock.request.headers["AccessToken"] } returns refreshToken
+
+    return mock
+}
+
+fun get_invalid_application_call_with_tampered_access_token(): ApplicationCall {
+    val mock = mockk<ApplicationCall>()
+    val accessToken = mocks.signAccessToken(user.username, user.permissionLevel.toString())
+    val refreshToken = mocks.signRefreshToken(user.username, user.permissionLevel.toString(), user.count)
+
+    every { mock.request.cookies["fnb-AccessToken-Payload"] } returns JWT.decode(accessToken).payload.removeRange(
+        IntRange(2,4)
+    )
+    every { mock.request.cookies["fnb-AccessToken-Signature"] } returns JWT.decode(accessToken).signature
+    every { mock.request.cookies["fnb-RefreshToken-Payload"] } returns JWT.decode(refreshToken).payload
+    every { mock.request.cookies["fnb-RefreshToken-Signature"] } returns JWT.decode(refreshToken).signature
+    every { mock.request.headers["RefreshToken"] } returns accessToken
+    every { mock.request.headers["AccessToken"] } returns refreshToken
+
+    return mock
+}
+
+fun get_invalid_application_call_with_tampered_refresh_token(): ApplicationCall {
+    val mock = mockk<ApplicationCall>()
+    val accessToken = mocks.signAccessToken(user.username, user.permissionLevel.toString())
+    val refreshToken = mocks.signRefreshToken(user.username, user.permissionLevel.toString(), user.count)
+
+    every { mock.request.cookies["fnb-AccessToken-Payload"] } returns JWT.decode(accessToken).payload
+    every { mock.request.cookies["fnb-AccessToken-Signature"] } returns JWT.decode(accessToken).signature
+    every { mock.request.cookies["fnb-RefreshToken-Payload"] } returns JWT.decode(refreshToken).payload.removeRange(
+        IntRange(2,4)
+    )
+    every { mock.request.cookies["fnb-RefreshToken-Signature"] } returns JWT.decode(refreshToken).signature
+    every { mock.request.headers["RefreshToken"] } returns accessToken
+    every { mock.request.headers["AccessToken"] } returns refreshToken
+
+    return mock
+}
+
+fun signAccessToken(username: String, permissionLevel: String? = null): String {
+
+    val secret= "FakeSecret"
+    val algorithm: Algorithm = Algorithm.HMAC256(secret)
+
+    val date = Calendar.getInstance().apply {
+        this.time = Date()
+        this.add(Calendar.MINUTE, 5)
+    }.time
+
+    return JWT.create()
+        .withIssuer(username)
+        .withExpiresAt(date)
+        .withClaim("key", username)
+        .withClaim("permissionLevel", permissionLevel)
+        .sign(algorithm)
+}
+
+fun signRefreshToken(username: String,
+                     permissionLevel: String? = null,
+                     count: Int? = 10): String {
+    val date = GregorianCalendar.getInstance().apply {
+        this.time = Date()
+        this.add(Calendar.MINUTE, 8440)
+    }.time
+
+    val secret= "FakeSecret"
+    val algorithm: Algorithm = Algorithm.HMAC256(secret)
+
+    return JWT.create()
+        .withIssuer(username)
+        .withExpiresAt(date)
+        .withClaim("key", username)
+        .withClaim("count", count)
+        .withClaim("permissionLevel", permissionLevel)
+        .sign(algorithm)
+}
+
+fun signAccessTokenExpired(username: String, permissionLevel: String? = null): String {
+
+    val secret= "FakeSecret"
+    val algorithm: Algorithm = Algorithm.HMAC256(secret)
+
+    val date = Calendar.getInstance().apply {
+        this.time = Date()
+        this.add(Calendar.MINUTE, -5)
+    }.time
+
+    return JWT.create()
+        .withIssuer(username)
+        .withExpiresAt(date)
+        .withClaim("key", username)
+        .withClaim("permissionLevel", permissionLevel)
+        .sign(algorithm)
+}
+
+fun signRefreshTokenExpired(username: String,
+                     permissionLevel: String? = null,
+                     count: Int? = 10): String {
+    val date = GregorianCalendar.getInstance().apply {
+        this.time = Date()
+        this.add(Calendar.MINUTE, -5)
+    }.time
+
+    val secret= "FakeSecret"
+    val algorithm: Algorithm = Algorithm.HMAC256(secret)
+
+    return JWT.create()
+        .withIssuer(username)
+        .withExpiresAt(date)
+        .withClaim("key", username)
+        .withClaim("count", count)
+        .withClaim("permissionLevel", permissionLevel)
+        .sign(algorithm)
+}

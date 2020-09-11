@@ -26,6 +26,9 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host:5.5.1")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.5.1")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.5.1")
+    implementation("org.koin", "koin-ktor", "2.1.5")
+    testImplementation("io.mockk:mockk:1.10.0")
+    implementation("at.favre.lib:bcrypt:0.9.0")
 }
 
 tasks {

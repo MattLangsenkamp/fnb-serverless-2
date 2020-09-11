@@ -12,11 +12,11 @@ import java.util.UUID
 private const val tableNameData: String = "fnb-data"
 
 @DynamoDBTable(tableNameData, PermissionLevel.ReadWrite)
-object LocationsServiceDynamo {
-    val client: AmazonDynamoDB = AmazonDynamoDBClientBuilder
+class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
+    /* val client: AmazonDynamoDB = AmazonDynamoDBClientBuilder
         .standard()
         .withCredentials(ProfileCredentialsProvider("fnb-admin"))
-        .build()
+        .build() */
     /**
      * Creates a new location entry in DynamoDB
      *

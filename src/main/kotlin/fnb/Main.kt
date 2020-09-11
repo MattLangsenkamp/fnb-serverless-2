@@ -1,7 +1,9 @@
 package fnb
 import com.google.gson.Gson
-import fnb.locations.getSchema
+import fnb.di.mainModule
+import fnb.locations.FnBSchema
 import fnb.locations.graphql
+import fnb.locations.services.AuthService
 import io.kotless.dsl.ktor.Kotless
 import io.ktor.application.Application
 import io.ktor.application.install
@@ -14,6 +16,9 @@ import io.ktor.gson.gson
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.routing.routing
+import org.koin.core.context.startKoin
+import org.koin.core.logger.PrintLogger
+import org.koin.ktor.ext.inject
 
 class Main : Kotless() {
 
@@ -25,7 +30,10 @@ class Main : Kotless() {
 }
 
 fun Application.main() {
-
+    startKoin {
+        PrintLogger()
+        modules(mainModule)
+    }
     install(DefaultHeaders)
     install(CallLogging)
     install(CORS) {
@@ -38,9 +46,10 @@ fun Application.main() {
         header(HttpHeaders.AccessControlAllowHeaders)
         header(HttpHeaders.ContentType)
         header(HttpHeaders.AccessControlAllowOrigin)
+        header("AccessToken")
+        header("RefreshToken")
         allowCredentials = true
         anyHost()
-        host("*")
     }
     install(ContentNegotiation) {
         gson {
@@ -48,6 +57,8 @@ fun Application.main() {
         }
     }
     routing {
-        graphql(log, Gson(), getSchema())
+        val schema: FnBSchema by inject()
+        val authService: AuthService by inject()
+        graphql(log, Gson(), schema.schema, authService)
     }
 }

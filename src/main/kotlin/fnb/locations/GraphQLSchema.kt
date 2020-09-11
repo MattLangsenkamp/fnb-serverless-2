@@ -11,16 +11,19 @@ import fnb.locations.model.Response
 import fnb.locations.services.AuthService
 import fnb.locations.services.LocationsServiceDynamo
 import io.ktor.application.ApplicationCall
+import org.koin.core.KoinComponent
+import org.koin.core.inject
 import org.slf4j.Logger
 
-fun getSchema(): Schema {
-    return KGraphQL.schema {
+class FnBSchema(private val authService: AuthService, private val locationsService: LocationsServiceDynamo):
+    KoinComponent {
+    val schema = KGraphQL.schema {
 
         query("getLocation") {
             resolver { id: String,
                        ctx: Context ->
                 val log = ctx.get<Logger>()!!
-                val location = LocationsServiceDynamo.getLocation(id)
+                val location = locationsService.getLocation(id)
                 val message = if (location != null) {
                     "Successfully fetched location with id: $id"
                 } else {
@@ -37,7 +40,7 @@ fun getSchema(): Schema {
         query("getAllLocations") {
             resolver {  ctx: Context ->
                 val log = ctx.get<Logger>()!!
-                val locations = LocationsServiceDynamo.getAllLocations()
+                val locations = locationsService.getAllLocations()
                 val (payload, message) = if (locations.isNotEmpty()) {
                     Pair(locations, "Successfully retrieved locations")
                 } else {
@@ -65,7 +68,7 @@ fun getSchema(): Schema {
 
                 if (accessToken != null && accessToken is DecodedJWT) {
                     val locationOwner = accessToken.getClaim("key").asString()
-                    val addedLocation = LocationsServiceDynamo.addLocation(
+                    val addedLocation = locationsService.addLocation(
                             name,
                             friendlyLocation,
                             description,
@@ -105,7 +108,7 @@ fun getSchema(): Schema {
                 val accessToken = ctx.get<Any>()
 
                 if (accessToken != null && accessToken is DecodedJWT) {
-                    val updatedLocation = LocationsServiceDynamo.updateLocation(Location(
+                    val updatedLocation = locationsService.updateLocation(Location(
                             id,
                             name,
                             friendlyLocation,
@@ -139,7 +142,7 @@ fun getSchema(): Schema {
                 val accessToken = ctx.get<Any>()
                 if (accessToken != null && accessToken is DecodedJWT) {
                     log.info(accessToken.getClaim("key").asString())
-                    val deletedLocation = LocationsServiceDynamo.deleteLocation(
+                    val deletedLocation = locationsService.deleteLocation(
                             id,
                             accessToken.getClaim("key").asString()
                     )
@@ -167,7 +170,7 @@ fun getSchema(): Schema {
                 ->
                 val call = ctx.get<ApplicationCall>()!!
                 val log = ctx.get<Logger>()!!
-                val tokens = AuthService.signIn(call, username, password)
+                val tokens = authService.signIn(call, username, password)
                 val message = if ((tokens.AccessToken != null) && (tokens.RefreshToken != null)) {
                     "Successfully signed in"
                 } else {
@@ -187,7 +190,7 @@ fun getSchema(): Schema {
                 ctx: Context
                 ->
                 val call = ctx.get<ApplicationCall>()!!
-                val tokens = AuthService.signUp(call, username, password)
+                val tokens = authService.signUp(call, username, password)
                 val message = if ((tokens.AccessToken != null) && (tokens.RefreshToken != null)) {
                     "sign up successful"
                 } else {
