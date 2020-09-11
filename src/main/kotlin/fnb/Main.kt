@@ -46,9 +46,10 @@ fun Application.main() {
         header(HttpHeaders.AccessControlAllowHeaders)
         header(HttpHeaders.ContentType)
         header(HttpHeaders.AccessControlAllowOrigin)
+        header("AccessToken")
+        header("RefreshToken")
         allowCredentials = true
         anyHost()
-        host("*")
     }
     install(ContentNegotiation) {
         gson {

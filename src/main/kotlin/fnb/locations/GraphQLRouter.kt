@@ -52,7 +52,8 @@ fun Route.graphql(log: Logger, gson: Gson, schema: Schema, authService: AuthServ
 
         try {
             val result = schema.execute(query, variables = variables, context = ctx)
-           log.info("the result: $result")
+            log.info("the result: $result")
+            log.info(call.response.cookies.toString())
             call.respondText(result)
         } catch (e: Exception) {
             call.respondText(gson.toJson(GraphQLErrors(e).asMap()))

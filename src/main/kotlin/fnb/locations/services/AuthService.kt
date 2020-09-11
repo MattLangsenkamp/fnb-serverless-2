@@ -18,6 +18,9 @@ import fnb.logging.MyLogger
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
 import io.ktor.application.ApplicationCall
+import io.ktor.response.header
+import io.ktor.util.date.GMTDate
+import io.ktor.util.date.Month
 import org.koin.core.KoinComponent
 import org.koin.core.get
 import java.util.*
@@ -230,11 +233,23 @@ class AuthService(private val client: AmazonDynamoDB) {
      * @param decodedTokens DecodedTokens class that represents the cookies
      */
     private fun setCookies(call: ApplicationCall, decodedTokens: DecodedTokens) {
+        val expDate =  GMTDate(dayOfMonth = 1,
+            month = Month.JANUARY,
+            year = 2022,
+            seconds = 1,
+            minutes = 1,
+            hours = 1)
+        call.response.header("Access-Control-Expose-Headers", "AccessToken, RefreshToken")
+        call.response.header("AccessToken", decodedTokens.AccessToken?.token ?: "")
+        call.response.header("RefreshToken", decodedTokens.RefreshToken?.token ?: "")
         if (decodedTokens.AccessToken != null) {
             call.response.cookies.append("fnb-AccessToken-Payload",
-                    "${decodedTokens.AccessToken.header}.${decodedTokens.AccessToken.payload.toString()}")
+                    "${decodedTokens.AccessToken.header}.${decodedTokens.AccessToken.payload.toString()}",
+                    extensions = mapOf("SameSite" to "None"), expires = expDate)
             call.response.cookies.append("fnb-AccessToken-Signature",
-                    decodedTokens.AccessToken.signature.toString(), httpOnly = true)
+                    decodedTokens.AccessToken.signature, httpOnly = true,
+                    extensions = mapOf("SameSite" to "None"), expires = expDate)
+
         } else {
             call.response.cookies.append("fnb-AccessToken-Payload",
                     "")
@@ -244,9 +259,12 @@ class AuthService(private val client: AmazonDynamoDB) {
 
         if (decodedTokens.RefreshToken != null) {
             call.response.cookies.append("fnb-RefreshToken-Payload",
-                    "${decodedTokens.RefreshToken.header}.${decodedTokens.RefreshToken.payload.toString()}")
+                    "${decodedTokens.RefreshToken.header}.${decodedTokens.RefreshToken.payload.toString()}",
+                    extensions = mapOf("SameSite" to "None"), expires = expDate)
             call.response.cookies.append("fnb-RefreshToken-Signature",
-                    decodedTokens.RefreshToken.signature.toString(), httpOnly = true)
+                    decodedTokens.RefreshToken.signature, httpOnly = true,
+                    extensions = mapOf("SameSite" to "None"),
+            expires = expDate)
         } else {
             call.response.cookies.append("fnb-RefreshToken-Payload",
                     "")
