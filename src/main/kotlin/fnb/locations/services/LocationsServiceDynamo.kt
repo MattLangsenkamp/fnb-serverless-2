@@ -25,7 +25,7 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
      * @param description description of location
      * @param latitude
      * @param longitude
-     * @param pictureURI the location of the associated picture
+     * @param picture the location of the associated picture
      * @param type the type of location
      * @return newly created location on success, null on failure
      */
@@ -34,7 +34,7 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
                     description: String,
                     latitude: Double,
                     longitude: Double,
-                    pictureURI: String,
+                    picture: String,
                     locationOwner: String,
                     type: LocationType
     ): Location? {
@@ -46,7 +46,7 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
             "description" to AttributeValue().apply { s = description },
             "latitude" to AttributeValue().apply { n = latitude.toString() },
             "longitude" to AttributeValue().apply { n = longitude.toString() },
-            "pictureURI" to AttributeValue().apply { s = pictureURI },
+            "picture" to AttributeValue().apply { s = picture },
             "locationOwner" to AttributeValue().apply { s = locationOwner },
             "type" to AttributeValue().apply { s = type.toString() }
         )
@@ -101,7 +101,7 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
             "description" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.description }),
             "latitude" to AttributeValueUpdate().withValue(AttributeValue().apply { n = location.latitude.toString() }),
             "longitude" to AttributeValueUpdate().withValue(AttributeValue().apply { n = location.longitude.toString() }),
-            "pictureURI" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.pictureURI }),
+            "picture" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.picture }),
             "type" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.type.toString() })
         )
         val req = UpdateItemRequest()
@@ -149,7 +149,7 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
                     res["description"]?.s.toString(),
                     res["latitude"]?.n.toString().toDouble(),
                     res["longitude"]?.n.toString().toDouble(),
-                    res["pictureURI"]?.s.toString(),
+                    res["picture"]?.s.toString(),
                     res["locationOwner"]?.s.toString(),
                     LocationType.valueOf(res["type"]?.s.toString())
             )

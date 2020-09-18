@@ -7,7 +7,7 @@ import fnb.locations.model.UserPermissionLevel
 
 val user = User(
     username = "Matt Lang",
-    password = "fake-pass",
+    password = "fake".toByteArray(),
     count = 10,
     permissionLevel = UserPermissionLevel.USER
 )
@@ -20,6 +20,6 @@ val location = Location(
     locationOwner = "matt lang",
     latitude = 0.0,
     longitude = 0.0,
-    pictureURI = "s3:/sure",
+    picture = "s3:/sure",
     type = LocationType.FREE_FOOD_STAND
 )
