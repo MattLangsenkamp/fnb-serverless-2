@@ -1,7 +1,7 @@
 package mocks
 
-import fnb.locations.model.EncodedTokens
-import fnb.locations.services.AuthService
+import fnb.model.EncodedTokens
+import fnb.services.AuthService
 import io.ktor.application.ApplicationCall
 import io.mockk.every
 import io.mockk.mockk

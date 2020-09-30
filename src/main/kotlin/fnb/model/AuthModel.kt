@@ -1,4 +1,4 @@
-package fnb.locations.model
+package fnb.model
 
 import com.auth0.jwt.interfaces.DecodedJWT
 

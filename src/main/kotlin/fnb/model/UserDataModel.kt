@@ -1,4 +1,4 @@
-package fnb.locations.model
+package fnb.model
 
 data class UserData(
     val id: String,

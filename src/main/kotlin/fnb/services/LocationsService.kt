@@ -1,4 +1,4 @@
-package fnb.locations.services
+package fnb.services
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.document.DynamoDB
@@ -6,8 +6,8 @@ import com.amazonaws.services.dynamodbv2.document.KeyAttribute
 import com.amazonaws.services.dynamodbv2.document.PrimaryKey
 import com.amazonaws.services.dynamodbv2.document.spec.UpdateItemSpec
 import com.amazonaws.services.dynamodbv2.model.*
-import fnb.locations.model.Location
-import fnb.locations.model.LocationType
+import fnb.model.Location
+import fnb.model.LocationType
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
 import java.util.*
