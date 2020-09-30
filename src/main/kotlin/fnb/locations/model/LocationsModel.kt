@@ -6,7 +6,7 @@ data class Location(val id: String,
                     val description: String,
                     val latitude: Double,
                     val longitude: Double,
-                    val pictureURI: String,
+                    val picture: String,
                     val locationOwner: String,
                     val type: LocationType
 )

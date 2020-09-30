@@ -1,13 +1,23 @@
 package fnb.locations.services
-import com.amazonaws.auth.profile.ProfileCredentialsProvider
+
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder
-import io.kotless.dsl.lang.DynamoDBTable
+import com.amazonaws.services.dynamodbv2.document.DynamoDB
+import com.amazonaws.services.dynamodbv2.document.KeyAttribute
+import com.amazonaws.services.dynamodbv2.document.PrimaryKey
+import com.amazonaws.services.dynamodbv2.document.spec.UpdateItemSpec
 import com.amazonaws.services.dynamodbv2.model.*
 import fnb.locations.model.Location
 import fnb.locations.model.LocationType
 import io.kotless.PermissionLevel
-import java.util.UUID
+import io.kotless.dsl.lang.DynamoDBTable
+import java.util.*
+import kotlin.collections.ArrayList
+import kotlin.collections.List
+import kotlin.collections.Map
+import kotlin.collections.mapOf
+import kotlin.collections.mutableMapOf
+import kotlin.collections.set
+import kotlin.collections.toList
 
 private const val tableNameData: String = "fnb-data"
 
@@ -25,18 +35,19 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
      * @param description description of location
      * @param latitude
      * @param longitude
-     * @param pictureURI the location of the associated picture
+     * @param picture the location of the associated picture
      * @param type the type of location
      * @return newly created location on success, null on failure
      */
-    fun addLocation(name: String,
-                    friendlyLocation: String,
-                    description: String,
-                    latitude: Double,
-                    longitude: Double,
-                    pictureURI: String,
-                    locationOwner: String,
-                    type: LocationType
+    fun addLocation(
+        name: String,
+        friendlyLocation: String,
+        description: String,
+        latitude: Double,
+        longitude: Double,
+        picture: String,
+        locationOwner: String,
+        type: LocationType
     ): Location? {
         val id: UUID = UUID.randomUUID()
         val item = mapOf(
@@ -46,11 +57,12 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
             "description" to AttributeValue().apply { s = description },
             "latitude" to AttributeValue().apply { n = latitude.toString() },
             "longitude" to AttributeValue().apply { n = longitude.toString() },
-            "pictureURI" to AttributeValue().apply { s = pictureURI },
+            "picture" to AttributeValue().apply { s = picture },
             "locationOwner" to AttributeValue().apply { s = locationOwner },
             "type" to AttributeValue().apply { s = type.toString() }
         )
         val req = PutItemRequest().withTableName(tableNameData).withItem(item).withReturnValues(ReturnValue.ALL_OLD)
+
         val res = client.putItem(req).sdkHttpMetadata.httpStatusCode
 
         return if (res == 200) constructLocation(item) else null
@@ -78,7 +90,7 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
      *
      * @return A list of Location data classes
      */
-    fun getAllLocations():List<Location?> {
+    fun getAllLocations(): List<Location?> {
         val req = ScanRequest().withTableName(tableNameData)
         val res = client.scan(req).items
         val locationList: ArrayList<Location?> = ArrayList()
@@ -94,30 +106,99 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
      * @param location the location to update, 0 or more fields my be changed with the exception of the id
      * @return the new location object on success, null on failure
      */
-    fun updateLocation(location: Location): Location? {
-        val map = mapOf(
-            "name" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.name }),
-            "friendlyLocation" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.friendlyLocation }),
-            "description" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.description }),
-            "latitude" to AttributeValueUpdate().withValue(AttributeValue().apply { n = location.latitude.toString() }),
-            "longitude" to AttributeValueUpdate().withValue(AttributeValue().apply { n = location.longitude.toString() }),
-            "pictureURI" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.pictureURI }),
-            "type" to AttributeValueUpdate().withValue(AttributeValue().apply { s = location.type.toString() })
+    fun updateLocation(
+        id: String,
+        name: String? = null,
+        friendlyLocation: String? = null,
+        description: String? = null,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        picture: String? = null,
+        locationOwner: String? = null,
+        type: LocationType? = null,
+        actionRequester: String
+    ): Location? {
+
+
+        val dynamoDB = DynamoDB(client)
+        val table = dynamoDB.getTable(tableNameData)
+        val updateExpression = StringBuilder("SET")
+        val nameMap = mutableMapOf<String, String>()
+        val valueMap = mutableMapOf<String, Any>()
+
+        if (name != null) {
+            val str = " #n=:n,"
+            updateExpression.append(str)
+            nameMap["#n"] = "name"
+            valueMap[":n"] = name
+        }
+        if (friendlyLocation != null) {
+            val str = " #f=:f,"
+            updateExpression.append(str)
+            nameMap["#f"] = "friendlyLocation"
+            valueMap[":f"] = friendlyLocation
+        }
+        if (description != null) {
+            val str = " #d=:d,"
+            updateExpression.append(str)
+            nameMap["#d"] = "description"
+            valueMap[":d"] = description
+        }
+        if (latitude != null) {
+            val str = " #la=:la,"
+            updateExpression.append(str)
+            nameMap["#la"] = "latitude"
+            valueMap[":la"] = latitude
+        }
+        if (longitude != null) {
+            val str = " #lo=:lo,"
+            updateExpression.append(str)
+            nameMap["#lo"] = "longitude"
+            valueMap[":lo"] = longitude
+        }
+
+        if (picture != null) {
+            val str = " #p=:p,"
+            updateExpression.append(str)
+            nameMap["#p"] = "picture"
+            valueMap[":p"] = picture
+        }
+        if (type != null) {
+            val str = " #ty=:ty,"
+            updateExpression.append(str)
+            nameMap["#ty"] = "type"
+            valueMap[":ty"] = type.toString()
+        }
+        if (locationOwner != null) {
+            val str = " #loc=:loc,"
+            updateExpression.append(str)
+            nameMap["#loc"] = "locationOwner"
+            valueMap[":loc"] = locationOwner
+        }
+
+        valueMap[":actReq"] = actionRequester
+
+        val updateItemSpec = UpdateItemSpec()
+            .withPrimaryKey(PrimaryKey(KeyAttribute("id", id)))
+            .withUpdateExpression(updateExpression.toString().dropLast(1))
+            .withConditionExpression("#loc = :actReq")
+            .withNameMap(nameMap)
+            .withValueMap(valueMap)
+            .withReturnValues(ReturnValue.ALL_NEW);
+        val retVal = table.updateItem(updateItemSpec)
+        val newLocation = retVal.item.asMap()
+        return Location(
+            newLocation["id"].toString(),
+            newLocation["name"].toString(),
+            newLocation["friendlyLocation"].toString(),
+            newLocation["description"].toString(),
+            newLocation["latitude"].toString().toDouble(),
+            newLocation["longitude"].toString().toDouble(),
+            newLocation["picture"].toString(),
+            newLocation["locationOwner"].toString(),
+            LocationType.valueOf(newLocation["type"].toString())
         )
-        val req = UpdateItemRequest()
-                .withConditionExpression("#locationOwner = :locationOwner")
-                .withExpressionAttributeValues(mapOf(":locationOwner" to AttributeValue().apply { s =  location.locationOwner }))
-                .withAttributeUpdates(map)
-                .withTableName(tableNameData)
-                .withKey(mapOf("id" to AttributeValue().apply { s = location.id }))
-                .withReturnValues(ReturnValue.UPDATED_NEW)
-        val res = client.updateItem(req)
-
-        if (res.sdkHttpMetadata.httpStatusCode != 200) error("not authorized")
-
-        return constructLocation(res.attributes)
     }
-
 
 
     /**
@@ -129,11 +210,11 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
      */
     fun deleteLocation(id: String, locationOwner: String): Location? {
         val req = DeleteItemRequest()
-                .withConditionExpression("locationOwner = :locationOwner")
-                .withExpressionAttributeValues(mapOf(":locationOwner" to AttributeValue().apply { s =  locationOwner }))
-                .withKey(mapOf("id" to AttributeValue().apply { s = id }))
-                .withTableName(tableNameData)
-                .withReturnValues(ReturnValue.ALL_OLD)
+            .withConditionExpression("locationOwner = :locationOwner")
+            .withExpressionAttributeValues(mapOf(":locationOwner" to AttributeValue().apply { s = locationOwner }))
+            .withKey(mapOf("id" to AttributeValue().apply { s = id }))
+            .withTableName(tableNameData)
+            .withReturnValues(ReturnValue.ALL_OLD)
         val res = client.deleteItem(req).attributes
         //if res is success return 1
         return constructLocation(res)
@@ -143,15 +224,15 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
         var returnLocation: Location? = null
         if (res != null) {
             returnLocation = Location(
-                    res["id"]?.s.toString(),
-                    res["name"]?.s.toString(),
-                    res["friendlyLocation"]?.s.toString(),
-                    res["description"]?.s.toString(),
-                    res["latitude"]?.n.toString().toDouble(),
-                    res["longitude"]?.n.toString().toDouble(),
-                    res["pictureURI"]?.s.toString(),
-                    res["locationOwner"]?.s.toString(),
-                    LocationType.valueOf(res["type"]?.s.toString())
+                res["id"]?.s.toString(),
+                res["name"]?.s.toString(),
+                res["friendlyLocation"]?.s.toString(),
+                res["description"]?.s.toString(),
+                res["latitude"]?.n.toString().toDouble(),
+                res["longitude"]?.n.toString().toDouble(),
+                res["picture"]?.s.toString(),
+                res["locationOwner"]?.s.toString(),
+                LocationType.valueOf(res["type"]?.s.toString())
             )
         }
         return returnLocation
