@@ -1,28 +1,20 @@
 package fnb.locations
 
-import fnb.locations.model.*
 import com.apurebase.kgraphql.Context
 import com.apurebase.kgraphql.KGraphQL
-import com.apurebase.kgraphql.schema.Schema
-import com.auth0.jwt.JWT
 import com.auth0.jwt.interfaces.DecodedJWT
-import fnb.locations.model.Location
-import fnb.locations.model.LocationType
-import fnb.locations.model.Response
+import fnb.locations.model.*
 import fnb.locations.services.AuthService
 import fnb.locations.services.LocationsServiceDynamo
 import fnb.locations.services.UserDataService
-import io.ktor.application.ApplicationCall
-import org.koin.core.KoinComponent
-import org.koin.core.inject
+import io.ktor.application.*
 import org.slf4j.Logger
 
 class FnBSchema(
     private val authService: AuthService,
     private val locationsService: LocationsServiceDynamo,
     private val userDataService: UserDataService
-) // :KoinComponent
-{
+) {
     val schema = KGraphQL.schema {
 
         query("getLocation") {
@@ -84,7 +76,7 @@ class FnBSchema(
                         locationOwner,
                         type
                     ) ?: error("i need to refactor this")
-                    userDataService.addLocationToUserData(accessToken.keyId, addedLocation.id)
+                    userDataService.addLocationToUserData(locationOwner, addedLocation.id, locationOwner)
                     val (payload, message) = Pair(listOf(addedLocation), "Successfully added location")
 
                     log.info(message)
@@ -109,7 +101,7 @@ class FnBSchema(
                        latitude: Double,
                        longitude: Double,
                        picture: String,
-                       type: LocationType,
+                       locationOwner: String,
                        ctx: Context ->
 
                 val log = ctx.get<Logger>()!!
@@ -117,17 +109,16 @@ class FnBSchema(
 
                 if (accessToken != null && accessToken is DecodedJWT) {
                     val updatedLocation = locationsService.updateLocation(
-                        Location(
-                            id,
-                            name,
-                            friendlyLocation,
-                            description,
-                            latitude,
-                            longitude,
-                            picture,
-                            accessToken.getClaim("key").asString(),
-                            type
-                        )
+                        id,
+                        name,
+                        friendlyLocation,
+                        description,
+                        latitude,
+                        longitude,
+                        picture,
+                        locationOwner,
+                        LocationType.FREE_FOOD_STAND,
+                        accessToken.getClaim("key").asString()
                     )
                     val (payload, message) = if (updatedLocation != null) {
                         Pair(listOf(updatedLocation), "Successfully updated location")
@@ -180,13 +171,13 @@ class FnBSchema(
         }
 
         mutation("signIn") {
-            resolver { username: String,
+            resolver { email: String,
                        password: String,
                        ctx: Context
                 ->
                 val call = ctx.get<ApplicationCall>()!!
                 val log = ctx.get<Logger>()!!
-                val tokens = authService.signIn(call, username, password)
+                val tokens = authService.signIn(call, email, password)
                 val message = if ((tokens.AccessToken != null) && (tokens.RefreshToken != null)) {
                     "Successfully signed in"
                 } else {
@@ -203,11 +194,12 @@ class FnBSchema(
 
         mutation("signUp") {
             resolver { email: String,
+                       username: String,
                        password: String,
                        ctx: Context
                 ->
                 val call = ctx.get<ApplicationCall>()!!
-                val tokens = authService.signUp(call, email, password)
+                val tokens = authService.signUp(call, email, username, password)
                 val message = if ((tokens.AccessToken != null) && (tokens.RefreshToken != null)) {
                     "sign up successful"
                 } else {
@@ -258,18 +250,55 @@ class FnBSchema(
                        locations: List<String>,
                        ctx: Context
                 ->
+                val accessToken = ctx.get<Any>()
                 val log = ctx.get<Logger>()!!
-                log.info("Retrieved user data for id: $id")
-                val userData = userDataService.updateUserData(id, username, contact, description, picture, locations)
-                UserDataResponse(
-                    message = "Successfully retrieved all user datas",
-                    payload = listOf(userData)
-                )
+
+                if (accessToken != null && accessToken is DecodedJWT) {
+                    val loggedInUser = accessToken.getClaim("key").asString()
+                    log.info("Retrieved user data for id: $id")
+                    val userData = userDataService.updateUserData(
+                        id,
+                        username,
+                        contact,
+                        description,
+                        picture,
+                        locations,
+                        loggedInUser
+                    )
+                    UserDataResponse(
+                        message = "Successfully retrieved all user datas",
+                        payload = listOf(userData)
+                    )
+                } else {
+                    UserDataResponse(
+                        message = "Not Authorized",
+                        payload = listOf()
+                    ) // maybe null tokens here?
+                }
             }
         }
 
         mutation("deleteUserData") {
-
+            resolver { id: String,
+                       ctx: Context
+                ->
+                val accessToken = ctx.get<Any>()
+                if (accessToken != null && accessToken is DecodedJWT) {
+                    val loggedInUser = accessToken.getClaim("key").asString()
+                    val log = ctx.get<Logger>()!!
+                    log.info("Retrieved user data for id: $id")
+                    val userData = userDataService.deleteUserData(id, loggedInUser)
+                    UserDataResponse(
+                        message = "Successfully deleted user data",
+                        payload = listOf(userData)
+                    )
+                } else {
+                    UserDataResponse(
+                        message = "Not Authorized",
+                        payload = listOf()
+                    ) // maybe null tokens here?
+                }
+            }
         }
 
         type<UserData>()

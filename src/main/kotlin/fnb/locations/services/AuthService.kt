@@ -1,5 +1,6 @@
 package fnb.locations.services
 
+import at.favre.lib.crypto.bcrypt.BCrypt
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.model.*
 import com.auth0.jwt.JWT
@@ -14,12 +15,11 @@ import fnb.locations.model.User
 import fnb.locations.model.UserPermissionLevel
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
-import io.ktor.application.ApplicationCall
-import io.ktor.response.header
-import java.util.*
-import at.favre.lib.crypto.bcrypt.BCrypt
+import io.ktor.application.*
+import io.ktor.response.*
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import java.util.*
 
 
 private const val tableName: String = "fnb-auth"
@@ -51,44 +51,48 @@ class AuthService(private val client: AmazonDynamoDB, private val userDataServic
                     .verify(
                         password.toByteArray(StandardCharsets.UTF_8),
                         user.password
-                    ).verified) {
+                    ).verified
+            ) {
                 error("Password incorrect")
             }
 
             val permissionLevel = user.permissionLevel
             val count = user.count
 
-            val accessToken = signAccessToken(email, permissionLevel.toString())
-            val refreshToken = signRefreshToken(email, permissionLevel.toString(), count)
+            val accessToken = signAccessToken(user.id, permissionLevel.toString())
+            val refreshToken = signRefreshToken(user.id, permissionLevel.toString(), count)
 
             setAccessTokens(call, DecodedTokens(JWT.decode(accessToken), JWT.decode(refreshToken)))
 
             EncodedTokens(
-                    AccessToken = accessToken,
-                    RefreshToken = refreshToken
+                AccessToken = accessToken,
+                RefreshToken = refreshToken
             )
 
         } catch (t: Throwable) {
             setAccessTokens(call, DecodedTokens(null, null))
             EncodedTokens(
-                    AccessToken = null,
-                    RefreshToken = null
+                AccessToken = null,
+                RefreshToken = null
             )
         }
     }
 
     /**
-     * @param email the username of the user signing up
+     * @param email the email of the user signing up
      * @param password the password of the user signing up
      * @param permissionLevel the permission level of the user
      *
      * @return EncodedTokens object with no null values if sign in successful
      * EncodedTokens object with two null values if unsuccessful
      */
-    fun signUp(call: ApplicationCall,
-               email: String,
-               password: String,
-               permissionLevel: UserPermissionLevel = UserPermissionLevel.USER): EncodedTokens {
+    fun signUp(
+        call: ApplicationCall,
+        email: String,
+        username: String,
+        password: String,
+        permissionLevel: UserPermissionLevel = UserPermissionLevel.USER
+    ): EncodedTokens {
         return try {
 
             val hashedPassword = BCrypt.withDefaults().hash(10, password.toByteArray(StandardCharsets.UTF_8))
@@ -102,14 +106,14 @@ class AuthService(private val client: AmazonDynamoDB, private val userDataServic
                 "permissionLevel" to AttributeValue().apply { s = permissionLevel.toString() }
             )
 
-            userDataService.addUserData(id = id.toString())
-
             // check for uniqueness for email and username
             val emailReq = ScanRequest()
-              .withFilterExpression("email==:email")
-              .withTableName(tableName)
-              .withExpressionAttributeValues(mutableMapOf(":email" to AttributeValue().apply { s = email }))
+                .withFilterExpression("email = :email")
+                .withTableName(tableName)
+                .withExpressionAttributeValues(mutableMapOf(":email" to AttributeValue().apply { s = email }))
             if (client.scan(emailReq).items.count() > 0) error("email already in use")
+
+            userDataService.addUserData(id = id.toString(), username = username)
 
             val req = PutItemRequest()
                 .withTableName(tableName)
@@ -122,22 +126,24 @@ class AuthService(private val client: AmazonDynamoDB, private val userDataServic
                     RefreshToken = signRefreshToken(id.toString())
                 )
             } else {
-                EncodedTokens (
+                EncodedTokens(
                     AccessToken = null,
                     RefreshToken = null
                 )
             }
 
-            setAccessTokens(call, DecodedTokens(
+            setAccessTokens(
+                call, DecodedTokens(
                     JWT.decode(returnValue.AccessToken),
-                    JWT.decode(returnValue.RefreshToken))
+                    JWT.decode(returnValue.RefreshToken)
+                )
             )
             returnValue
         } catch (t: Throwable) {
             setAccessTokens(call, DecodedTokens(null, null))
-            EncodedTokens (
-                    AccessToken = null,
-                    RefreshToken = null
+            EncodedTokens(
+                AccessToken = null,
+                RefreshToken = null
             )
         }
     }
@@ -176,10 +182,11 @@ class AuthService(private val client: AmazonDynamoDB, private val userDataServic
                     null
                 }
                 val newRefreshToken = JWT.decode(
-                        signRefreshToken(
-                                id,
-                                count = tokenCount,
-                                permissionLevel = tokenPermissionLevel)
+                    signRefreshToken(
+                        id,
+                        count = tokenCount,
+                        permissionLevel = tokenPermissionLevel
+                    )
                 )
                 Pair(accessToken, newRefreshToken)
             } catch (e: JWTVerificationException) {
@@ -208,12 +215,12 @@ class AuthService(private val client: AmazonDynamoDB, private val userDataServic
             "count" to AttributeValueUpdate().withValue(AttributeValue().apply { n = newCount.toString() })
         )
         val req = UpdateItemRequest()
-                .withConditionExpression("#id = :id")
-                .withExpressionAttributeValues(mapOf(":id" to AttributeValue().apply { s =  id }))
-                .withAttributeUpdates(map)
-                .withTableName(tableName)
-                .withKey(mapOf("id" to AttributeValue().apply { s = id}))
-                .withReturnValues(ReturnValue.UPDATED_NEW)
+            .withConditionExpression("#id = :id")
+            .withExpressionAttributeValues(mapOf(":id" to AttributeValue().apply { s = id }))
+            .withAttributeUpdates(map)
+            .withTableName(tableName)
+            .withKey(mapOf("id" to AttributeValue().apply { s = id }))
+            .withReturnValues(ReturnValue.UPDATED_NEW)
         val res = client.updateItem(req)
         if (res.sdkHttpMetadata.httpStatusCode != 200) error("could not invalidate refresh token")
     }
@@ -229,8 +236,8 @@ class AuthService(private val client: AmazonDynamoDB, private val userDataServic
         val accessToken = call.request.headers["AccessToken"] ?: "no-access-token"
 
         return EncodedTokens(
-                AccessToken = accessToken,
-                RefreshToken = refreshToken
+            AccessToken = accessToken,
+            RefreshToken = refreshToken
         )
     }
 
@@ -252,8 +259,7 @@ class AuthService(private val client: AmazonDynamoDB, private val userDataServic
             this.add(Calendar.MINUTE, 5)
         }.time
 
-        val actualPermissionLevel: String = permissionLevel ?:
-            getUserInfo(id).permissionLevel.toString()
+        val actualPermissionLevel: String = permissionLevel ?: getUserInfo(id).permissionLevel.toString()
 
         return JWT.create()
             .withIssuer(id)
@@ -263,19 +269,19 @@ class AuthService(private val client: AmazonDynamoDB, private val userDataServic
             .sign(algorithm)
     }
 
-    private fun signRefreshToken(id: String,
-                                 permissionLevel: String? = null,
-                                 count: Int? = null): String {
+    private fun signRefreshToken(
+        id: String,
+        permissionLevel: String? = null,
+        count: Int? = null
+    ): String {
         val date = GregorianCalendar.getInstance().apply {
             this.time = Date()
             this.add(Calendar.MINUTE, 8440)
         }.time
 
-        val actualPermissionLevel: String = permissionLevel ?:
-            getUserInfo(id).permissionLevel.toString()
+        val actualPermissionLevel: String = permissionLevel ?: getUserInfo(id).permissionLevel.toString()
 
-        val actualCount = count ?:
-            getUserInfo(id).count
+        val actualCount = count ?: getUserInfo(id).count
 
         return JWT.create()
             .withIssuer(id)
@@ -291,20 +297,20 @@ class AuthService(private val client: AmazonDynamoDB, private val userDataServic
      * @param email the email of the user to get
      * @return a user object that describes the requested user, and null if no such user exists
      */
-    private fun getUserInfo(id: String?=null, email: String?=null): User {
+    private fun getUserInfo(id: String? = null, email: String? = null): User {
 
 
         val userMap = if (id != null) {
-            val req =GetItemRequest().withKey(mapOf(
+            val req = GetItemRequest().withKey(mapOf(
                 "id" to AttributeValue().apply { s = id }
             )).withTableName(tableName)
             client.getItem(req).item ?: error("user does not exist")
         } else if (email != null) {
             val req = ScanRequest()
-              .withFilterExpression("email==:email")
-              .withTableName(tableName)
-              .withExpressionAttributeValues(mutableMapOf(":email" to AttributeValue().apply { s = email }))
-           client.scan(req).items[0]
+                .withFilterExpression("email = :email")
+                .withTableName(tableName)
+                .withExpressionAttributeValues(mutableMapOf(":email" to AttributeValue().apply { s = email }))
+            client.scan(req).items[0]
         } else {
             error("no user identification provided")
         }
@@ -312,10 +318,10 @@ class AuthService(private val client: AmazonDynamoDB, private val userDataServic
         val hashedPassword = ByteArray(userMap["password"]?.b?.remaining() ?: 0)
         userMap["password"]?.b?.get(hashedPassword)
         return User(
-                id = userMap["id"]?.s.toString(),
-                password = hashedPassword,
-                count = userMap["count"]?.n.toString().toInt(),
-                permissionLevel = UserPermissionLevel.valueOf(userMap["permissionLevel"]?.s.toString())
+            id = userMap["id"]?.s.toString(),
+            password = hashedPassword,
+            count = userMap["count"]?.n.toString().toInt(),
+            permissionLevel = UserPermissionLevel.valueOf(userMap["permissionLevel"]?.s.toString())
         )
 
     }
