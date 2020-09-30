@@ -1,9 +1,9 @@
 package mocks
 
-import fnb.locations.model.Location
-import fnb.locations.model.LocationType
-import fnb.locations.model.User
-import fnb.locations.model.UserPermissionLevel
+import fnb.model.Location
+import fnb.model.LocationType
+import fnb.model.User
+import fnb.model.UserPermissionLevel
 
 val user = User(
     username = "Matt Lang",

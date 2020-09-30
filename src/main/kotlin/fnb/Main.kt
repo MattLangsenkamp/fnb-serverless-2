@@ -1,9 +1,9 @@
 package fnb
 import com.google.gson.Gson
 import fnb.di.mainModule
-import fnb.locations.FnBSchema
-import fnb.locations.graphql
-import fnb.locations.services.AuthService
+import fnb.graphql.FnBSchema
+import fnb.graphql.graphql
+import fnb.services.AuthService
 import io.kotless.dsl.ktor.Kotless
 import io.ktor.application.Application
 import io.ktor.application.install

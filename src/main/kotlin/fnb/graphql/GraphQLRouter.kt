@@ -1,10 +1,8 @@
-package fnb.locations
+package fnb.graphql
 import com.apurebase.kgraphql.context
 import com.apurebase.kgraphql.schema.Schema
-import com.auth0.jwt.JWT
-import com.auth0.jwt.interfaces.DecodedJWT
 import com.google.gson.Gson
-import fnb.locations.services.AuthService
+import fnb.services.AuthService
 import fnb.logging.MyLogger
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
@@ -13,7 +11,6 @@ import io.ktor.application.call
 import io.ktor.request.receive
 import io.ktor.response.respondText
 import io.ktor.routing.post
-import org.koin.ktor.ext.inject
 import org.slf4j.Logger
 
 private const val tableName: String = "fnb-data"

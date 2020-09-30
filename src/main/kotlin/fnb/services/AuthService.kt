@@ -1,4 +1,4 @@
-package fnb.locations.services
+package fnb.services
 
 import at.favre.lib.crypto.bcrypt.BCrypt
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
@@ -9,10 +9,10 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.JWTVerificationException
 import com.auth0.jwt.exceptions.TokenExpiredException
 import com.auth0.jwt.interfaces.DecodedJWT
-import fnb.locations.model.DecodedTokens
-import fnb.locations.model.EncodedTokens
-import fnb.locations.model.User
-import fnb.locations.model.UserPermissionLevel
+import fnb.model.DecodedTokens
+import fnb.model.EncodedTokens
+import fnb.model.User
+import fnb.model.UserPermissionLevel
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
 import io.ktor.application.*
