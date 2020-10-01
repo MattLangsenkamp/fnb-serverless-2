@@ -11,8 +11,6 @@ import org.slf4j.Logger
 
 
 fun SchemaBuilder.userDataSchema(
-    authService: AuthService,
-    locationsService: LocationsServiceDynamo,
     userDataService: UserDataService
 ) {
     query("getUserData") {

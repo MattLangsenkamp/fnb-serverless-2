@@ -1,5 +1,6 @@
 package fnb.services
-
+import com.amazonaws.services.secretsmanager.*;
+import com.amazonaws.services.secretsmanager.model.*
 import at.favre.lib.crypto.bcrypt.BCrypt
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.model.*
@@ -25,12 +26,16 @@ import java.util.*
 private const val tableName: String = "fnb-auth"
 
 @DynamoDBTable(tableName, PermissionLevel.ReadWrite)
-class AuthService(private val client: AmazonDynamoDB, private val userDataService: UserDataService) {
-    /*private val client: AmazonDynamoDB = AmazonDynamoDBClientBuilder
-            .standard()
-            .withCredentials(ProfileCredentialsProvider("fnb-admin"))
-            .build()*/
-    private val secret: String = "FakeSecret"
+class AuthService(private val client: AmazonDynamoDB, private val secretsClient: AWSSecretsManager ,private val userDataService: UserDataService) {
+
+    private val secret: String
+
+    init {
+        val secretRequest = GetSecretValueRequest().withSecretId("prod/fnb/jwt")
+        val result = secretsClient.getSecretValue(secretRequest)
+        secret = result.secretString
+    }
+
     private val algorithm: Algorithm = Algorithm.HMAC256(secret)
     private val verifier: JWTVerifier = JWT.require(algorithm).build()
 
