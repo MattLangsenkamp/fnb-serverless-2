@@ -11,9 +11,7 @@ import org.slf4j.Logger
 
 
 fun SchemaBuilder.authSchema(
-    authService: AuthService,
-    locationsService: LocationsServiceDynamo,
-    userDataService: UserDataService
+    authService: AuthService
 ) {
     mutation("signIn") {
         resolver { email: String,

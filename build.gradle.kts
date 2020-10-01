@@ -7,6 +7,7 @@ plugins {
 }
 
 group = "org.example"
+
 version = "1.0-SNAPSHOT"
 
 repositories {
@@ -20,10 +21,11 @@ dependencies {
     implementation("io.kotless", "ktor-lang", "0.1.5")
     implementation("io.ktor", "ktor-gson", "1.3.2")
     implementation("com.amazonaws", "aws-java-sdk-dynamodb", "1.11.650")
+    implementation("com.amazonaws", "aws-java-sdk-secretsmanager","1.11.650" )
     implementation("commons-validator", "commons-validator", "1.6")
     implementation("io.ktor:ktor-auth-jwt:1.3.2")
     implementation("io.ktor:ktor-auth:1.3.2")
-    testImplementation("io.ktor:ktor-server-test-host:5.5.1")
+
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.5.1")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.5.1")
     implementation("org.koin", "koin-ktor", "2.1.5")

@@ -11,7 +11,6 @@ import org.slf4j.Logger
 
 
 fun SchemaBuilder.locationsSchema(
-    authService: AuthService,
     locationsService: LocationsServiceDynamo,
     userDataService: UserDataService
 ) {

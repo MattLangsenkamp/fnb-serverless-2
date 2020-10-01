@@ -11,8 +11,8 @@ class FnBSchema(
     private val userDataService: UserDataService
 ) {
     val schema = KGraphQL.schema {
-        authSchema(authService, locationsService, userDataService)
-        locationsSchema(authService, locationsService, userDataService)
-        userDataSchema(authService, locationsService, userDataService)
+        authSchema(authService)
+        locationsSchema(locationsService, userDataService)
+        userDataSchema(userDataService)
     }
 }
