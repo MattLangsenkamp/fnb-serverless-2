@@ -54,7 +54,6 @@ fun SchemaBuilder.authSchema(
         }
     }
     type<UserData>()
-    type<Location>()
     enum<LocationType>()
     type<Response>()
     type<AuthResponse>()

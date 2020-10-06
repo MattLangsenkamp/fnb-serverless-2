@@ -1,24 +1,26 @@
 package fnb
-import com.google.gson.Gson
+
+import com.apurebase.kgraphql.Context
+import com.apurebase.kgraphql.GraphQL
 import fnb.di.mainModule
-import fnb.graphql.FnBSchema
-import fnb.graphql.graphql
+import org.slf4j.Logger
+import fnb.graphql.authSchema
+import fnb.graphql.locationsSchema
+import fnb.graphql.userDataSchema
+import fnb.model.Location
+import fnb.model.LocationType
 import fnb.services.AuthService
+import fnb.services.LocationsService
+import fnb.services.UserDataService
 import io.kotless.dsl.ktor.Kotless
-import io.ktor.application.Application
-import io.ktor.application.install
-import io.ktor.application.log
-import io.ktor.features.CORS
-import io.ktor.features.CallLogging
-import io.ktor.features.ContentNegotiation
-import io.ktor.features.DefaultHeaders
-import io.ktor.gson.gson
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpMethod
-import io.ktor.routing.routing
+import io.ktor.application.*
+import io.ktor.features.*
+import io.ktor.gson.*
+import io.ktor.http.*
 import org.koin.core.context.startKoin
 import org.koin.core.logger.PrintLogger
 import org.koin.ktor.ext.inject
+import io.ktor.application.log
 
 class Main : Kotless() {
 
@@ -56,9 +58,44 @@ fun Application.main() {
             setPrettyPrinting()
         }
     }
-    routing {
-        val schema: FnBSchema by inject()
+
+    install(GraphQL) {
         val authService: AuthService by inject()
-        graphql(log, Gson(), schema.schema, authService)
+        val locationsService: LocationsService by inject()
+        val userDataService: UserDataService by inject()
+
+        context { call ->
+            authService.verifyToken(call)?.let {
+                +it
+            }
+            +log
+        }
+        playground = true
+        /*schema {
+            query("hello") {
+                resolver { -> "World!" }
+            }
+        }*/
+
+        schema {
+            type<Location>()
+            enum<LocationType>()
+            query("getAllLocations") {
+                resolver { ctx: Context ->
+                    val log = ctx.get<Logger>()!!
+                    val locations = locationsService.getAllLocations()
+                    val (payload, message) = if (locations.isNotEmpty()) {
+                        Pair(locations, "Successfully retrieved locations")
+                    } else {
+                        Pair(locations, "Could not fetch locations")
+                    }
+                    log.info(message)
+                    locations
+                }
+            }
+            // authSchema(authService)
+            // locationsSchema(locationsService, userDataService)
+            // userDataSchema(userDataService)
+        }
     }
 }

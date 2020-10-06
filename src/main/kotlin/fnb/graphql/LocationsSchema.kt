@@ -42,10 +42,7 @@ fun SchemaBuilder.locationsSchema(
                 Pair(locations, "Could not fetch locations")
             }
             log.info(message)
-            Response(
-                message = message,
-                payload = payload
-            )
+            locations
         }
     }
 
@@ -166,4 +163,5 @@ fun SchemaBuilder.locationsSchema(
             }
         }
     }
+    type<Location>()
 }
