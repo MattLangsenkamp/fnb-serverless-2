@@ -22,11 +22,8 @@ import kotlin.collections.toList
 private const val tableNameData: String = "fnb-data"
 
 @DynamoDBTable(tableNameData, PermissionLevel.ReadWrite)
-class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
-    /* val client: AmazonDynamoDB = AmazonDynamoDBClientBuilder
-        .standard()
-        .withCredentials(ProfileCredentialsProvider("fnb-admin"))
-        .build() */
+class LocationsService(private val client: AmazonDynamoDB, private val imageService: ImageService) {
+
     /**
      * Creates a new location entry in DynamoDB
      *
@@ -160,8 +157,9 @@ class LocationsServiceDynamo(private val client: AmazonDynamoDB) {
         if (picture != null) {
             val str = " #p=:p,"
             updateExpression.append(str)
+            val pictureUri = imageService.uploadImage(picture, id, ImageType.LOCATION)
             nameMap["#p"] = "picture"
-            valueMap[":p"] = picture
+            valueMap[":p"] = pictureUri
         }
         if (type != null) {
             val str = " #ty=:ty,"

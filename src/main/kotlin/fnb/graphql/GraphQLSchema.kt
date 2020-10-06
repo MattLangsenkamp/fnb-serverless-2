@@ -2,12 +2,12 @@ package fnb.graphql
 
 import com.apurebase.kgraphql.KGraphQL
 import fnb.services.AuthService
-import fnb.services.LocationsServiceDynamo
+import fnb.services.LocationsService
 import fnb.services.UserDataService
 
 class FnBSchema(
     private val authService: AuthService,
-    private val locationsService: LocationsServiceDynamo,
+    private val locationsService: LocationsService,
     private val userDataService: UserDataService
 ) {
     val schema = KGraphQL.schema {
