@@ -16,7 +16,7 @@ import java.util.*
 private const val tableName: String = "fnb-user-data"
 
 @DynamoDBTable(tableName, PermissionLevel.ReadWrite)
-class UserDataService(private val client: AmazonDynamoDB) {
+class UserDataService(private val client: AmazonDynamoDB, private val imageService: ImageService) {
     fun addUserData(
         id: String,
         username: String? = null,
@@ -96,8 +96,9 @@ class UserDataService(private val client: AmazonDynamoDB) {
         if (picture != null) {
             val str = " #p=:p,"
             updateExpression.append(str)
+            val pictureUri = imageService.uploadImage(picture, id, ImageType.USER)
             nameMap["#p"] = "picture"
-            valueMap[":p"] = picture
+            valueMap[":p"] = pictureUri
         }
         if (locations != null) {
             val str = " #l=:l,"

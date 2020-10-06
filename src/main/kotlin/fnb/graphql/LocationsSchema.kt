@@ -4,19 +4,19 @@ import com.apurebase.kgraphql.Context
 import com.apurebase.kgraphql.schema.dsl.SchemaBuilder
 import com.auth0.jwt.interfaces.DecodedJWT
 import fnb.model.*
-import fnb.services.AuthService
-import fnb.services.LocationsServiceDynamo
+import fnb.services.LocationsService
 import fnb.services.UserDataService
 import org.slf4j.Logger
 
 
 fun SchemaBuilder.locationsSchema(
-    locationsService: LocationsServiceDynamo,
+    locationsService: LocationsService,
     userDataService: UserDataService
 ) {
     query("getLocation") {
         resolver { id: String,
-                   ctx: Context ->
+                   ctx: Context
+            ->
             val log = ctx.get<Logger>()!!
             val location = locationsService.getLocation(id)
             val message = if (location != null) {

@@ -3,7 +3,6 @@ import com.apurebase.kgraphql.context
 import com.apurebase.kgraphql.schema.Schema
 import com.google.gson.Gson
 import fnb.services.AuthService
-import fnb.logging.MyLogger
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
 import io.ktor.routing.Route
@@ -33,7 +32,6 @@ fun Route.graphql(log: Logger, gson: Gson, schema: Schema, authService: AuthServ
         // the k-graphql schema will try and grab a Decoded Jwt. if the tokens are not present or invalid then
         // it will pick up a null object instead.
         val tokens = authService.verifyToken(call) ?: "invalid"
-        MyLogger.logger = log
 
         val ctx = context {
             +tokens
@@ -50,7 +48,6 @@ fun Route.graphql(log: Logger, gson: Gson, schema: Schema, authService: AuthServ
         try {
             val result = schema.execute(query, variables = variables, context = ctx)
             log.info("the result: $result")
-            log.info(call.response.cookies.toString())
             call.respondText(result)
         } catch (e: Exception) {
             call.respondText(gson.toJson(GraphQLErrors(e).asMap()))

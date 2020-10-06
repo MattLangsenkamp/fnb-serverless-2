@@ -4,8 +4,6 @@ import com.apurebase.kgraphql.Context
 import com.apurebase.kgraphql.schema.dsl.SchemaBuilder
 import fnb.model.*
 import fnb.services.AuthService
-import fnb.services.LocationsServiceDynamo
-import fnb.services.UserDataService
 import io.ktor.application.*
 import org.slf4j.Logger
 

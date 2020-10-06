@@ -4,6 +4,8 @@ import com.amazonaws.services.secretsmanager.model.*
 import at.favre.lib.crypto.bcrypt.BCrypt
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.model.*
+import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
+import com.amazonaws.services.simplesystemsmanagement.model.GetParameterRequest
 import com.auth0.jwt.JWT
 import com.auth0.jwt.JWTVerifier
 import com.auth0.jwt.algorithms.Algorithm
@@ -16,6 +18,7 @@ import fnb.model.User
 import fnb.model.UserPermissionLevel
 import io.kotless.PermissionLevel
 import io.kotless.dsl.lang.DynamoDBTable
+import io.kotless.dsl.lang.SSMParameters
 import io.ktor.application.*
 import io.ktor.response.*
 import java.nio.ByteBuffer
@@ -24,16 +27,19 @@ import java.util.*
 
 
 private const val tableName: String = "fnb-auth"
-
+@SSMParameters("", PermissionLevel.Read)
 @DynamoDBTable(tableName, PermissionLevel.ReadWrite)
-class AuthService(private val client: AmazonDynamoDB, private val secretsClient: AWSSecretsManager ,private val userDataService: UserDataService) {
+class AuthService(private val client: AmazonDynamoDB, private val secretsClient: AWSSimpleSystemsManagement, private val userDataService: UserDataService) { //private val secretsClient: AWSSecretsManager
 
     private val secret: String
 
-    init {
+    init {/*
         val secretRequest = GetSecretValueRequest().withSecretId("prod/fnb/jwt")
         val result = secretsClient.getSecretValue(secretRequest)
         secret = result.secretString
+        */
+         val request = GetParameterRequest().withName("fnb-jwt-secret").withWithDecryption(true)
+        secret = secretsClient.getParameter(request).parameter.value
     }
 
     private val algorithm: Algorithm = Algorithm.HMAC256(secret)
@@ -259,7 +265,7 @@ class AuthService(private val client: AmazonDynamoDB, private val secretsClient:
     }
 
     private fun signAccessToken(id: String, permissionLevel: String? = null): String {
-        val date = Calendar.getInstance().apply {
+        val date = GregorianCalendar.getInstance().apply {
             this.time = Date()
             this.add(Calendar.MINUTE, 5)
         }.time
