@@ -26,11 +26,10 @@ fun SchemaBuilder.userDataSchema(
     }
 
     query("getAllUserDatas") {
-        resolver { id: String,
-                   ctx: Context
+        resolver { ctx: Context
             ->
             val log = ctx.get<Logger>()!!
-            log.info("Retrieved user data for id: $id")
+            log.info("Getting all user Datas")
             val userData = userDataService.getAllUsers()
             UserDataResponse(
                 message = "Successfully retrieved all user datas",

@@ -142,7 +142,7 @@ class UserDataService(private val client: AmazonDynamoDB, private val imageServi
         val res = client.scan(req).items
         val userDataList: ArrayList<UserData> = ArrayList()
         for (item in res) {
-            userDataList.add(constructUserData(item))
+            userDataList.add(constructUserDataAttributes(item))
         }
         return userDataList.toList()
     }

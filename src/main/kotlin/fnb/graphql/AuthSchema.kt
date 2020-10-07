@@ -18,6 +18,7 @@ fun SchemaBuilder.authSchema(
             ->
             val call = ctx.get<ApplicationCall>()!!
             val log = ctx.get<Logger>()!!
+            log.info("call: ${call == null}")
             val tokens = authService.signIn(call, email, password)
             val message = if ((tokens.AccessToken != null) && (tokens.RefreshToken != null)) {
                 "Successfully signed in"

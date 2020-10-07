@@ -1,4 +1,5 @@
 package fnb.services
+
 import com.amazonaws.services.secretsmanager.*;
 import com.amazonaws.services.secretsmanager.model.*
 import at.favre.lib.crypto.bcrypt.BCrypt
@@ -27,18 +28,19 @@ import java.util.*
 
 
 private const val tableName: String = "fnb-auth"
+
 @SSMParameters("", PermissionLevel.Read)
 @DynamoDBTable(tableName, PermissionLevel.ReadWrite)
-class AuthService(private val client: AmazonDynamoDB, private val secretsClient: AWSSimpleSystemsManagement, private val userDataService: UserDataService) { //private val secretsClient: AWSSecretsManager
+class AuthService(
+    private val client: AmazonDynamoDB,
+    private val secretsClient: AWSSimpleSystemsManagement,
+    private val userDataService: UserDataService
+) {
 
     private val secret: String
 
-    init {/*
-        val secretRequest = GetSecretValueRequest().withSecretId("prod/fnb/jwt")
-        val result = secretsClient.getSecretValue(secretRequest)
-        secret = result.secretString
-        */
-         val request = GetParameterRequest().withName("fnb-jwt-secret").withWithDecryption(true)
+    init {
+        val request = GetParameterRequest().withName("fnb-jwt-secret").withWithDecryption(true)
         secret = secretsClient.getParameter(request).parameter.value
     }
 

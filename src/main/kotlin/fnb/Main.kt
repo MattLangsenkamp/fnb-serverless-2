@@ -1,21 +1,16 @@
 package fnb
 
-import com.apurebase.kgraphql.Context
 import com.apurebase.kgraphql.GraphQL
 import fnb.di.mainModule
-import org.slf4j.Logger
 import fnb.graphql.authSchema
 import fnb.graphql.locationsSchema
 import fnb.graphql.userDataSchema
-import fnb.model.Location
-import fnb.model.LocationType
 import fnb.services.AuthService
 import fnb.services.LocationsService
 import fnb.services.UserDataService
 import io.kotless.dsl.ktor.Kotless
 import io.ktor.application.*
 import io.ktor.features.*
-import io.ktor.gson.*
 import io.ktor.http.*
 import org.koin.core.context.startKoin
 import org.koin.core.logger.PrintLogger
@@ -53,11 +48,7 @@ fun Application.main() {
         allowCredentials = true
         anyHost()
     }
-    install(ContentNegotiation) {
-        gson {
-            setPrettyPrinting()
-        }
-    }
+
 
     install(GraphQL) {
         val authService: AuthService by inject()
@@ -69,33 +60,14 @@ fun Application.main() {
                 +it
             }
             +log
+            +call
         }
         playground = true
-        /*schema {
-            query("hello") {
-                resolver { -> "World!" }
-            }
-        }*/
 
         schema {
-            type<Location>()
-            enum<LocationType>()
-            query("getAllLocations") {
-                resolver { ctx: Context ->
-                    val log = ctx.get<Logger>()!!
-                    val locations = locationsService.getAllLocations()
-                    val (payload, message) = if (locations.isNotEmpty()) {
-                        Pair(locations, "Successfully retrieved locations")
-                    } else {
-                        Pair(locations, "Could not fetch locations")
-                    }
-                    log.info(message)
-                    locations
-                }
-            }
-            // authSchema(authService)
-            // locationsSchema(locationsService, userDataService)
-            // userDataSchema(userDataService)
+             authSchema(authService)
+             locationsSchema(locationsService, userDataService)
+             userDataSchema(userDataService)
         }
     }
 }
